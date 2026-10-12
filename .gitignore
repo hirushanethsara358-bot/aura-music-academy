@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+.npm/
+
+# Build output
+dist/
+build/
+coverage/
+
+# Environment & Secrets (NEVER commit secrets or service accounts)
+.env
+.env.local
+.env.*.local
+*service-account*.json
+*firebase-adminsdk*.json
+*.pem
+*.key
+
+# Firebase Emulator & Cache
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+pubsub-debug.log
+emulator-data/
+
+# Editor & OS
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+Thumbs.db
