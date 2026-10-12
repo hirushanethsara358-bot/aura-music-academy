@@ -1,0 +1,311 @@
+import {
+  createUserWithEmailAndPassword,
+  onAuthStateChanged,
+  sendPasswordResetEmail,
+  signInWithEmailAndPassword,
+  signOut,
+  updateProfile,
+  User,
+} from 'firebase/auth';
+import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { readJson, removeKey, STORAGE_KEYS, writeJson } from '../lib/storage';
+import { UserProfile } from '../types/content';
+import { getFirebaseAuth, getFirestoreDb, isFirebaseConfigured } from './firebase';
+
+export interface AuraUser {
+  uid: string;
+  email: string;
+  displayName: string;
+  isAdmin: boolean;
+  isLocal: boolean;
+}
+
+interface LocalUserRecord {
+  uid: string;
+  email: string;
+  passwordHash: string;
+  displayName: string;
+  createdAt: string;
+}
+
+/**
+ * Local password hashing.
+ *
+ * SECURITY NOTE — READ CAREFULLY:
+ * Local Studio Mode is a fully offline development/preview convenience so the
+ * whole platform can be explored without a Firebase project. It is NOT a
+ * production authentication system and must never be treated as one. Hashes are
+ * computed with the Web Crypto API purely so plaintext passwords are never
+ * written to localStorage. Production deployments must configure Firebase
+ * Authentication (see docs/FIREBASE_SETUP.md) — Firebase then handles password
+ * hashing and storage server-side and no credential material ever reaches the
+ * browser's persistent storage.
+ */
+async function hashPassword(password: string): Promise<string> {
+  const data = new TextEncoder().encode(`aura-local::${password}`);
+  if (typeof crypto !== 'undefined' && crypto.subtle) {
+    const digest = await crypto.subtle.digest('SHA-256', data);
+    return Array.from(new Uint8Array(digest))
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('');
+  }
+  // Deterministic fallback for environments without Web Crypto (never used for real auth).
+  let hash = 0;
+  for (let i = 0; i < data.length; i += 1) {
+    hash = (hash << 5) - hash + data[i];
+    hash |= 0;
+  }
+  return `fallback-${hash}`;
+}
+
+function localUsers(): LocalUserRecord[] {
+  return readJson<LocalUserRecord[]>(STORAGE_KEYS.localUsers, []);
+}
+
+function saveLocalUsers(users: LocalUserRecord[]): void {
+  writeJson(STORAGE_KEYS.localUsers, users);
+}
+
+function toAuraUser(record: LocalUserRecord): AuraUser {
+  return {
+    uid: record.uid,
+    email: record.email,
+    displayName: record.displayName,
+    isAdmin: false,
+    isLocal: true,
+  };
+}
+
+export function friendlyAuthError(error: unknown): string {
+  const code = (error as { code?: string })?.code ?? '';
+  switch (code) {
+    case 'auth/invalid-email':
+      return 'ඊමේල් ලිපිනය වැරදියි. කරුණාකර නිවැරදි ලිපිනයක් ඇතුළත් කරන්න.';
+    case 'auth/user-disabled':
+      return 'මෙම ගිණුම අක්‍රීය කර ඇත. කරුණාකර සහාය අමතන්න.';
+    case 'auth/user-not-found':
+      return 'මෙම ඊමේල් ලිපිනයෙන් ගිණුමක් නොමැත. කරුණාකර ලියාපදිංචි වන්න.';
+    case 'auth/wrong-password':
+    case 'auth/invalid-credential':
+      return 'මුරපදය හෝ ඊමේල් ලිපිනය වැරදියි. කරුණාකර නැවත උත්සාහ කරන්න.';
+    case 'auth/weak-password':
+      return 'මුරපදය දුර්වලයි. අවම වශයෙන් අකුරු 6 ක් භාවිතා කරන්න.';
+    case 'auth/email-already-in-use':
+      return 'මෙම ඊමේල් ලිපිනයෙන් දැනටමත් ගිණුමක් ඇත. කරුණාකර පිවිසෙන්න.';
+    case 'auth/too-many-requests':
+      return 'උත්සාහ කිරීම් ඉතා වැඩියෙන් සිදු විය. කරුණාකර මඳ වේලාවකින් නැවත උත්සාහ කරන්න.';
+    case 'auth/network-request-failed':
+      return 'අන්තර්ජාල සම්බන්ධතාවේ ගැටලුවක් ඇත. කරුණාකර සම්බන්ධතාව පරීක්ෂා කරන්න.';
+    case 'auth/requires-recent-login':
+      return 'මෙම ක්‍රියාව සඳහා නැවත පිවිසීම අවශ්‍යයි.';
+    default:
+      return 'පිවිසීමේ දෝෂයක් ඇතිවිය. කරුණාකර නැවත උත්සාහ කරන්න.';
+  }
+}
+
+export async function registerWithEmail(
+  email: string,
+  password: string,
+  displayName: string
+): Promise<AuraUser> {
+  const trimmedEmail = email.trim();
+  const name = displayName.trim() || trimmedEmail.split('@')[0];
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+    throw new Error('කරුණාකර නිවැරදි ඊමේල් ලිපිනයක් ඇතුළත් කරන්න.');
+  }
+  if (password.length < 6) {
+    throw new Error('මුරපදය අවම වශයෙන් අකුරු 6 ක් විය යුතුයි.');
+  }
+
+  const auth = getFirebaseAuth();
+  if (auth) {
+    const credential = await createUserWithEmailAndPassword(auth, trimmedEmail, password);
+    await updateProfile(credential.user, { displayName: name });
+
+    const db = getFirestoreDb();
+    if (db) {
+      // Only non-sensitive profile fields are stored. Never passwords.
+      await setDoc(doc(db, 'users', credential.user.uid), {
+        uid: credential.user.uid,
+        email: trimmedEmail,
+        displayName: name,
+        lastVisitedLessonSlug: null,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+    }
+
+    return {
+      uid: credential.user.uid,
+      email: trimmedEmail,
+      displayName: name,
+      isAdmin: false,
+      isLocal: false,
+    };
+  }
+
+  // ---- Local Studio Mode ----
+  const users = localUsers();
+  if (users.some((u) => u.email.toLowerCase() === trimmedEmail.toLowerCase())) {
+    throw new Error('මෙම ඊමේල් ලිපිනයෙන් දැනටමත් ගිණුමක් ඇත. කරුණාකර පිවිසෙන්න.');
+  }
+
+  const record: LocalUserRecord = {
+    uid: `local-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+    email: trimmedEmail,
+    passwordHash: await hashPassword(password),
+    displayName: name,
+    createdAt: new Date().toISOString(),
+  };
+  users.push(record);
+  saveLocalUsers(users);
+  writeJson(STORAGE_KEYS.sessionUid, record.uid);
+  writeJson(STORAGE_KEYS.displayName, name);
+  return toAuraUser(record);
+}
+
+export async function loginWithEmail(email: string, password: string): Promise<AuraUser> {
+  const trimmedEmail = email.trim();
+  const auth = getFirebaseAuth();
+  if (auth) {
+    const credential = await signInWithEmailAndPassword(auth, trimmedEmail, password);
+    const isAdmin = await checkAdminClaim(credential.user);
+    return {
+      uid: credential.user.uid,
+      email: credential.user.email ?? trimmedEmail,
+      displayName: credential.user.displayName ?? trimmedEmail.split('@')[0],
+      isAdmin,
+      isLocal: false,
+    };
+  }
+
+  const users = localUsers();
+  const match = users.find((u) => u.email.toLowerCase() === trimmedEmail.toLowerCase());
+  if (!match) {
+    throw new Error('මෙම ඊමේල් ලිපිනයෙන් ගිණුමක් නොමැත. කරුණාකර ලියාපදිංචි වන්න.');
+  }
+  const hash = await hashPassword(password);
+  if (hash !== match.passwordHash) {
+    throw new Error('මුරපදය වැරදියි. කරුණාකර නැවත උත්සාහ කරන්න.');
+  }
+  writeJson(STORAGE_KEYS.sessionUid, match.uid);
+  writeJson(STORAGE_KEYS.displayName, match.displayName);
+  return toAuraUser(match);
+}
+
+export async function logout(): Promise<void> {
+  const auth = getFirebaseAuth();
+  if (auth) {
+    await signOut(auth);
+    return;
+  }
+  removeKey(STORAGE_KEYS.sessionUid);
+  removeKey(STORAGE_KEYS.displayName);
+}
+
+export async function requestPasswordReset(email: string): Promise<void> {
+  const trimmed = email.trim();
+  const auth = getFirebaseAuth();
+  if (auth) {
+    await sendPasswordResetEmail(auth, trimmed);
+    return;
+  }
+  const users = localUsers();
+  const exists = users.some((u) => u.email.toLowerCase() === trimmed.toLowerCase());
+  if (!exists) {
+    throw new Error('මෙම ඊමේල් ලිපිනයෙන් ගිණුමක් නොමැත.');
+  }
+  // Local Studio Mode cannot send email. Never claim a message was delivered.
+  throw new Error(
+    'දේශීය ප්‍රකාරයේ (Local Mode) ඊමේල් යැවිය නොහැක. මුරපද යළි සැකසීමට Firebase සම්බන්ධ කරන්න — docs/FIREBASE_SETUP.md බලන්න.'
+  );
+}
+
+/**
+ * Admin privilege check.
+ *
+ * SECURITY NOTE: Admin rights are derived from a custom auth claim
+ * (request.auth.token.admin == true), which Firebase sets server-side and which
+ * a user cannot modify from the browser. This function is ONLY used to decide
+ * whether to *render* admin UI. Firestore Security Rules independently enforce
+ * every privileged write, so hiding or showing a button is never the control.
+ */
+async function checkAdminClaim(user: User): Promise<boolean> {
+  try {
+    const token = await user.getIdTokenResult();
+    return token.claims.admin === true;
+  } catch {
+    return false;
+  }
+}
+
+export async function getCurrentUser(): Promise<AuraUser | null> {
+  const auth = getFirebaseAuth();
+  if (auth) {
+    const user = auth.currentUser;
+    if (!user) return null;
+    return {
+      uid: user.uid,
+      email: user.email ?? '',
+      displayName: user.displayName ?? (user.email ?? '').split('@')[0],
+      isAdmin: await checkAdminClaim(user),
+      isLocal: false,
+    };
+  }
+
+  const uid = readJson<string | null>(STORAGE_KEYS.sessionUid, null);
+  if (!uid) return null;
+  const record = localUsers().find((u) => u.uid === uid);
+  return record ? toAuraUser(record) : null;
+}
+
+export function subscribeToAuthChanges(
+  callback: (user: AuraUser | null) => void
+): () => void {
+  const auth = getFirebaseAuth();
+  if (!auth) {
+    void getCurrentUser().then(callback);
+    return () => undefined;
+  }
+
+  return onAuthStateChanged(auth, async (user) => {
+    if (!user) {
+      callback(null);
+      return;
+    }
+    callback({
+      uid: user.uid,
+      email: user.email ?? '',
+      displayName: user.displayName ?? (user.email ?? '').split('@')[0],
+      isAdmin: await checkAdminClaim(user),
+      isLocal: false,
+    });
+  });
+}
+
+export async function fetchUserProfile(uid: string): Promise<UserProfile | null> {
+  const db = getFirestoreDb();
+  if (db) {
+    try {
+      const snap = await getDoc(doc(db, 'users', uid));
+      if (snap.exists()) return snap.data() as UserProfile;
+    } catch (error) {
+      console.warn('[Aura] authService: profile read failed.', error);
+    }
+  }
+  const record = localUsers().find((u) => u.uid === uid);
+  if (!record) return null;
+  return {
+    uid: record.uid,
+    email: record.email,
+    displayName: record.displayName,
+    lastVisitedLessonSlug: readJson<string | null>(`${STORAGE_KEYS.lastVisited}::${uid}`, null),
+    createdAt: record.createdAt,
+    updatedAt: record.createdAt,
+  };
+}
+
+export function usingFirebaseAuth(): boolean {
+  return isFirebaseConfigured();
+}
