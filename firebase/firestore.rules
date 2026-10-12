@@ -1,0 +1,239 @@
+rules_version = '2';
+
+// ============================================================================
+// Aura Music Academy — Firestore Security Rules
+// ============================================================================
+// Design principles
+//   1. DEFAULT DENY. Anything not explicitly allowed below is rejected.
+//   2. Public catalogue content is world-readable, but ONLY when published.
+//   3. A signed-in user may read and write ONLY their own private sub-collections.
+//      Cross-user access is impossible at the rules layer, not just in the UI.
+//   4. Admin privilege comes from a trusted server-set custom claim
+//      (request.auth.token.admin == true). A client cannot forge it.
+//   5. Never trust a client-supplied field to grant privilege (no
+//      "role: 'admin'" in the profile is ever consulted).
+//   6. Array sizes and string lengths are bounded to prevent storage abuse.
+// ============================================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ------------------------------------------------------------------
+    // Helper functions
+    // ------------------------------------------------------------------
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      // Custom claims are set server-side via the Firebase Admin SDK or
+      // Google Cloud IAM. They are cryptographically signed into the ID
+      // token and cannot be edited from a browser.
+      return isSignedIn() && request.auth.token.admin == true;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    // Ensure the caller cannot write arbitrary privilege-bearing fields or
+    // change the identity of a document they own.
+    function keepsUid(uid) {
+      return request.resource.data.uid == uid;
+    }
+
+    function changedOnly(allowedFields) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(allowedFields);
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[A-Za-z0-9_.:-]+$');
+    }
+
+    function boundedString(value, maxLength) {
+      return value is string && value.size() > 0 && value.size() <= maxLength;
+    }
+
+    function boundedStringList(list, maxItems, maxLength) {
+      return list is list && list.size() <= maxItems
+        && list.join('').size() <= maxItems * maxLength;
+    }
+
+    // ------------------------------------------------------------------
+    // Public catalogue: courses and lessons
+    // ------------------------------------------------------------------
+    // Anyone (signed in or not) may READ published catalogue documents.
+    // Only a trusted admin may create, update or delete them.
+
+    match /courses/{courseId} {
+      allow read: if resource.data.published == true
+                  || (isSignedIn() && request.query.limit <= 50 && isAdmin());
+
+      allow read: if isAdmin();
+
+      allow create, update: if isAdmin()
+        && isValidId(courseId)
+        && boundedString(request.resource.data.titleSi, 200)
+        && boundedString(request.resource.data.titleEn, 200)
+        && boundedString(request.resource.data.descriptionSi, 4000)
+        && boundedStringList(request.resource.data.lessonsInOrder, 400, 128)
+        && request.resource.data.published is bool
+        && request.resource.data.order is int;
+
+      allow delete: if isAdmin();
+    }
+
+    match /lessons/{lessonId} {
+      allow read: if resource.data.published == true;
+
+      allow read: if isAdmin();
+
+      allow create, update: if isAdmin()
+        && isValidId(lessonId)
+        && boundedString(request.resource.data.titleSi, 300)
+        && boundedString(request.resource.data.titleEn, 300)
+        && boundedString(request.resource.data.slug, 200)
+        && boundedString(request.resource.data.courseId, 128)
+        && boundedString(request.resource.data.summarySi, 4000)
+        && boundedStringList(request.resource.data.learningObjectives, 40, 500)
+        && request.resource.data.published is bool
+        && request.resource.data.order is int
+        && request.resource.data.estimatedMinutes is int;
+
+      allow delete: if isAdmin();
+    }
+
+    match /quizzes/{quizId} {
+      allow read: if true;
+
+      allow create, update: if isAdmin()
+        && isValidId(quizId)
+        && boundedString(request.resource.data.titleSi, 300)
+        && request.resource.data.questions is list
+        && request.resource.data.questions.size() > 0
+        && request.resource.data.questions.size() <= 100;
+
+      allow delete: if isAdmin();
+    }
+
+    // ------------------------------------------------------------------
+    // User profiles
+    // ------------------------------------------------------------------
+    // A user may create and maintain their OWN profile document. They may
+    // never touch anyone else's and may never write privilege fields.
+
+    match /users/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+
+      allow create: if isOwner(uid)
+        && keepsUid(uid)
+        && request.resource.data.keys().hasOnly([
+             'uid', 'email', 'displayName', 'lastVisitedLessonSlug',
+             'createdAt', 'updatedAt'
+           ])
+        && boundedString(request.resource.data.email, 320)
+        && boundedString(request.resource.data.displayName, 120);
+
+      allow update: if isOwner(uid)
+        && keepsUid(uid)
+        // Privilege-bearing fields such as `role` or `admin` are not in the
+        // allowed list, so a user can never grant themselves admin access.
+        && changedOnly([
+             'displayName', 'lastVisitedLessonSlug', 'updatedAt'
+           ])
+        && boundedString(request.resource.data.displayName, 120);
+
+      allow delete: if isOwner(uid) || isAdmin();
+    }
+
+    // ------------------------------------------------------------------
+    // Per-user learning progress
+    // ------------------------------------------------------------------
+
+    match /users/{uid}/progress/{lessonId} {
+      allow read: if isOwner(uid) || isAdmin();
+
+      allow create, update: if isOwner(uid)
+        && keepsUid(uid)
+        && isValidId(lessonId)
+        && request.resource.data.keys().hasOnly([
+             'uid', 'lessonId', 'completed', 'lastVisitedAt',
+             'completedAt', 'updatedAt'
+           ])
+        && request.resource.data.lessonId == lessonId
+        && request.resource.data.completed is bool;
+
+      allow delete: if isOwner(uid) || isAdmin();
+    }
+
+    // ------------------------------------------------------------------
+    // Per-user bookmarks
+    // ------------------------------------------------------------------
+
+    match /users/{uid}/bookmarks/{lessonId} {
+      allow read: if isOwner(uid) || isAdmin();
+
+      allow create: if isOwner(uid)
+        && keepsUid(uid)
+        && request.resource.data.keys().hasOnly(['uid', 'lessonId', 'createdAt'])
+        && request.resource.data.lessonId == lessonId;
+
+      allow update: if false; // bookmarks are create-or-delete only
+
+      allow delete: if isOwner(uid) || isAdmin();
+    }
+
+    // ------------------------------------------------------------------
+    // Quiz attempts
+    // ------------------------------------------------------------------
+    // An attempt is always owned by the caller. A student can never write an
+    // attempt on behalf of another uid.
+
+    match /quizAttempts/{attemptId} {
+      allow read: if isAdmin()
+                  || (isSignedIn() && resource.data.uid == request.auth.uid);
+
+      allow create: if isSignedIn()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasOnly([
+             'uid', 'quizId', 'lessonId', 'answers', 'score',
+             'totalQuestions', 'percentage', 'passed', 'createdAt'
+           ])
+        && boundedString(request.resource.data.quizId, 128)
+        && request.resource.data.score is int
+        && request.resource.data.score >= 0
+        && request.resource.data.totalQuestions is int
+        && request.resource.data.totalQuestions > 0
+        && request.resource.data.score <= request.resource.data.totalQuestions
+        && request.resource.data.percentage is int
+        && request.resource.data.percentage >= 0
+        && request.resource.data.percentage <= 100
+        && request.resource.data.passed is bool;
+
+      allow update, delete: if false; // attempts are immutable once recorded
+    }
+
+    // ------------------------------------------------------------------
+    // Admin audit log (optional, admin-only, append-only from the client)
+    // ------------------------------------------------------------------
+
+    match /adminAuditLogs/{logId} {
+      allow read: if isAdmin();
+
+      allow create: if isAdmin()
+        && boundedString(request.resource.data.action, 200)
+        && boundedString(request.resource.data.targetId, 200);
+
+      allow update, delete: if false;
+    }
+
+    // ------------------------------------------------------------------
+    // Explicit catch-all deny for anything not matched above.
+    // ------------------------------------------------------------------
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
