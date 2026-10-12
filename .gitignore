@@ -31,3 +31,6 @@ emulator-data/
 *.swp
 *.swo
 Thumbs.db
+
+# TypeScript incremental build info
+*.tsbuildinfo
