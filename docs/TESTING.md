@@ -303,9 +303,16 @@ Record the emulator output in the pull request.
 
 **Secrets scan**
 ```bash
-git grep -nE "(serviceAccount|private_key|BEGIN PRIVATE KEY|firebase-adminsdk)" -- . || echo "clean"
-git status --ignored --short | grep -E "\.env$" && echo "WARNING: .env present" || echo "no .env tracked"
+npm run check:secrets                                  # pattern-based scan of tracked files
+git ls-files | grep -E "(^|/)\.env$" && echo "STOP: .env tracked" || echo "clean: no .env tracked"
+git ls-files | grep -E "^dist/" && echo "STOP: dist tracked" || echo "clean: dist untracked"
 ```
+
+`scripts/check-secrets.mjs` looks for real credential shapes (private key blocks,
+GitHub/AWS/Google/Slack tokens, service-account JSON) across all tracked files
+while skipping documentation, which legitimately *mentions* these mechanisms. It
+never prints a matched secret — only the file and line — so the scan output is
+safe to paste into an issue.
 
 ---
 

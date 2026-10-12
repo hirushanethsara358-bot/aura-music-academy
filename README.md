@@ -156,6 +156,7 @@ npm test             # Vitest single run
 npm run test:watch   # Vitest watch mode
 npm run build        # typecheck + production bundle
 npm run preview      # serve dist/ on 0.0.0.0:4173
+npm run check:secrets # scan tracked files for credential patterns
 ```
 
 ---
