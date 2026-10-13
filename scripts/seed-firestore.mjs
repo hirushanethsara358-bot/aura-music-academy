@@ -51,7 +51,7 @@ async function loadSeedModules() {
       entryPoints: [
         path.join(repoRoot, 'src/content/courses/seedCourses.ts'),
         path.join(repoRoot, 'src/content/lessons/index.ts'),
-        path.join(repoRoot, 'src/content/quizzes/index.ts'),
+        path.join(repoRoot, 'src/content/quizzes/seedQuizzes.ts'),
       ],
       bundle: true,
       format: 'esm',
@@ -70,7 +70,7 @@ async function loadSeedModules() {
     return {
       SEED_COURSES: modules.seedCourses.SEED_COURSES,
       ALL_SEED_LESSONS: modules.index.ALL_SEED_LESSONS,
-      SEED_QUIZZES: modules.index.SEED_QUIZZES,
+      SEED_QUIZZES: modules.seedQuizzes.SEED_QUIZZES,
     };
   }
 

@@ -1,3 +1,4 @@
+import { get, ref, remove, set } from 'firebase/database';
 import {
   collection,
   deleteDoc,
@@ -10,7 +11,7 @@ import {
 } from 'firebase/firestore';
 import { BookmarkItem, LessonProgress } from '../types/content';
 import { readJson, STORAGE_KEYS, writeJson } from '../lib/storage';
-import { getFirestoreDb } from './firebase';
+import { getFirestoreDb, getRealtimeDb } from './firebase';
 
 export interface ProgressStats {
   totalPublishedLessons: number;
@@ -50,21 +51,39 @@ function writeLocalProgress(uid: string, records: LessonProgress[]): void {
  * Load all progress records for a single user.
  *
  * Security: the query is always constrained to `uid == the signed-in user`, and
- * Firestore Security Rules independently reject any attempt to read another
- * user's sub-collection.
+ * both `database.rules.json` (Realtime DB) and `firestore.rules` (Firestore)
+ * independently reject any attempt to read another user's records.
  */
 export async function fetchUserProgress(uid: string): Promise<LessonProgress[]> {
+  const rtdb = getRealtimeDb();
+  if (rtdb) {
+    try {
+      const snap = await get(ref(rtdb, `userProgress/${uid}`));
+      if (snap.exists()) {
+        const val = snap.val() as Record<string, LessonProgress>;
+        const list = Object.entries(val).map(([lessonId, data]) => ({
+          ...data,
+          uid,
+          lessonId,
+        }));
+        writeLocalProgress(uid, list);
+        return list;
+      }
+    } catch (error) {
+      console.warn('[Aura] progressService: RTDB read failed, using fallback.', error);
+    }
+  }
+
   const db = getFirestoreDb();
   if (db) {
     try {
-      const q = query(
-        collection(db, 'users', uid, 'progress'),
-        limit(500)
-      );
+      const q = query(collection(db, 'users', uid, 'progress'), limit(500));
       const snapshot = await getDocs(q);
-      return snapshot.docs.map((d) => ({ ...(d.data() as LessonProgress), lessonId: d.id }));
+      if (!snapshot.empty) {
+        return snapshot.docs.map((d) => ({ ...(d.data() as LessonProgress), lessonId: d.id }));
+      }
     } catch (error) {
-      console.warn('[Aura] progressService: remote read failed, using local cache.', error);
+      console.warn('[Aura] progressService: Firestore read failed, using local cache.', error);
     }
   }
   return readLocalProgress(uid);
@@ -87,6 +106,15 @@ export async function setLessonCompletion(
     updatedAt: nowIso,
   };
 
+  const rtdb = getRealtimeDb();
+  if (rtdb) {
+    try {
+      await set(ref(rtdb, `userProgress/${uid}/${lessonId}`), record);
+    } catch (error) {
+      console.warn('[Aura] progressService: RTDB write failed, saving locally.', error);
+    }
+  }
+
   const db = getFirestoreDb();
   if (db) {
     try {
@@ -99,7 +127,7 @@ export async function setLessonCompletion(
         updatedAt: serverTimestamp(),
       });
     } catch (error) {
-      console.warn('[Aura] progressService: remote write failed, saving locally.', error);
+      console.warn('[Aura] progressService: Firestore write failed, saving locally.', error);
     }
   }
 
@@ -114,23 +142,30 @@ export async function markLessonVisited(uid: string, lessonId: string): Promise<
   const records = readLocalProgress(uid);
   const existing = records.find((p) => p.lessonId === lessonId);
 
-  if (existing) {
-    existing.lastVisitedAt = nowIso;
-    existing.updatedAt = nowIso;
-    writeLocalProgress(uid, records);
-  } else {
-    records.push({
-      uid,
-      lessonId,
-      completed: false,
-      lastVisitedAt: nowIso,
-      completedAt: null,
-      updatedAt: nowIso,
-    });
-    writeLocalProgress(uid, records);
-  }
+  const nextRecord: LessonProgress = existing
+    ? { ...existing, lastVisitedAt: nowIso, updatedAt: nowIso }
+    : {
+        uid,
+        lessonId,
+        completed: false,
+        lastVisitedAt: nowIso,
+        completedAt: null,
+        updatedAt: nowIso,
+      };
 
+  const updatedList = records.filter((p) => p.lessonId !== lessonId);
+  updatedList.push(nextRecord);
+  writeLocalProgress(uid, updatedList);
   writeJson(lastVisitedKey(uid), lessonId);
+
+  const rtdb = getRealtimeDb();
+  if (rtdb) {
+    try {
+      await set(ref(rtdb, `userProgress/${uid}/${lessonId}`), nextRecord);
+    } catch (error) {
+      console.warn('[Aura] progressService: RTDB visit write failed.', error);
+    }
+  }
 
   const db = getFirestoreDb();
   if (db) {
@@ -148,20 +183,41 @@ export async function markLessonVisited(uid: string, lessonId: string): Promise<
         { merge: true }
       );
     } catch (error) {
-      console.warn('[Aura] progressService: visit write failed.', error);
+      console.warn('[Aura] progressService: Firestore visit write failed.', error);
     }
   }
 }
 
 export async function fetchBookmarks(uid: string): Promise<BookmarkItem[]> {
+  const rtdb = getRealtimeDb();
+  if (rtdb) {
+    try {
+      const snap = await get(ref(rtdb, `userBookmarks/${uid}`));
+      if (snap.exists()) {
+        const val = snap.val() as Record<string, BookmarkItem>;
+        const list = Object.entries(val).map(([lessonId, data]) => ({
+          ...data,
+          uid,
+          lessonId,
+        }));
+        writeJson(bookmarksKey(uid), list);
+        return list;
+      }
+    } catch (error) {
+      console.warn('[Aura] progressService: RTDB bookmark read failed.', error);
+    }
+  }
+
   const db = getFirestoreDb();
   if (db) {
     try {
       const q = query(collection(db, 'users', uid, 'bookmarks'), limit(500));
       const snapshot = await getDocs(q);
-      return snapshot.docs.map((d) => ({ ...(d.data() as BookmarkItem), lessonId: d.id }));
+      if (!snapshot.empty) {
+        return snapshot.docs.map((d) => ({ ...(d.data() as BookmarkItem), lessonId: d.id }));
+      }
     } catch (error) {
-      console.warn('[Aura] progressService: bookmark read failed, using local cache.', error);
+      console.warn('[Aura] progressService: Firestore bookmark read failed, using local cache.', error);
     }
   }
   return readJson<BookmarkItem[]>(bookmarksKey(uid), []);
@@ -172,6 +228,25 @@ export async function toggleBookmark(
   lessonId: string,
   currentlyBookmarked: boolean
 ): Promise<BookmarkItem[]> {
+  const nowIso = new Date().toISOString();
+
+  const rtdb = getRealtimeDb();
+  if (rtdb) {
+    try {
+      if (currentlyBookmarked) {
+        await remove(ref(rtdb, `userBookmarks/${uid}/${lessonId}`));
+      } else {
+        await set(ref(rtdb, `userBookmarks/${uid}/${lessonId}`), {
+          uid,
+          lessonId,
+          createdAt: nowIso,
+        });
+      }
+    } catch (error) {
+      console.warn('[Aura] progressService: RTDB bookmark write failed.', error);
+    }
+  }
+
   const db = getFirestoreDb();
   if (db) {
     try {
@@ -185,14 +260,14 @@ export async function toggleBookmark(
         });
       }
     } catch (error) {
-      console.warn('[Aura] progressService: bookmark write failed.', error);
+      console.warn('[Aura] progressService: Firestore bookmark write failed.', error);
     }
   }
 
   const current = readJson<BookmarkItem[]>(bookmarksKey(uid), []);
   const next = currentlyBookmarked
     ? current.filter((b) => b.lessonId !== lessonId)
-    : [...current, { uid, lessonId, createdAt: new Date().toISOString() }];
+    : [...current, { uid, lessonId, createdAt: nowIso }];
   writeJson(bookmarksKey(uid), next);
   return next;
 }

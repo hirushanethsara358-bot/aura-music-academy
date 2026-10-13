@@ -1,8 +1,21 @@
-import { collection, doc, getDoc, getDocs, limit, orderBy, query, where } from 'firebase/firestore';
+import { equalTo, get, orderByChild, query as rtdbQuery, ref, set } from 'firebase/database';
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  limit,
+  orderBy,
+  query,
+  setDoc,
+  where,
+} from 'firebase/firestore';
 import { Lesson } from '../types/content';
 import { ALL_SEED_LESSONS } from '../content/lessons';
+import { SEED_COURSES } from '../content/courses/seedCourses';
+import { SEED_QUIZZES } from '../content/quizzes';
 import { readJson, STORAGE_KEYS, writeJson } from '../lib/storage';
-import { getFirestoreDb } from './firebase';
+import { getFirestoreDb, getRealtimeDb } from './firebase';
 
 const COLLECTION = 'lessons';
 
@@ -26,11 +39,30 @@ export function saveEditorOverride(override: LessonOverride): void {
   writeJson(STORAGE_KEYS.editorOverrides, current);
 }
 
+export function getCustomLessons(): Lesson[] {
+  return readJson<Lesson[]>(STORAGE_KEYS.customLessons, []);
+}
+
+export function saveCustomLesson(lesson: Lesson): void {
+  const current = getCustomLessons().filter((l) => l.id !== lesson.id);
+  current.push(lesson);
+  writeJson(STORAGE_KEYS.customLessons, current);
+}
+
 function applyOverrides(lessons: Lesson[]): Lesson[] {
   const overrides = getEditorOverrides();
-  if (overrides.length === 0) return lessons;
+  const custom = getCustomLessons();
+  const byCustomId = new Map(custom.map((l) => [l.id, l]));
+  const merged = lessons.map((l) => byCustomId.get(l.id) ?? l);
+  for (const c of custom) {
+    if (!merged.some((m) => m.id === c.id)) {
+      merged.push(c);
+    }
+  }
+
+  if (overrides.length === 0) return merged;
   const byId = new Map(overrides.map((o) => [o.lessonId, o]));
-  return lessons.map((lesson) => {
+  return merged.map((lesson) => {
     const o = byId.get(lesson.id);
     if (!o) return lesson;
     return {
@@ -47,9 +79,40 @@ function applyOverrides(lessons: Lesson[]): Lesson[] {
 
 /**
  * Fetch all published lessons.
- * One-time `getDocs` only — no real-time listeners are used.
+ * Checks Firebase Realtime Database (`rtdb`) first when configured, then
+ * Cloud Firestore (`db`), using one-time reads only.
  */
 export async function fetchPublishedLessons(): Promise<Lesson[]> {
+  const rtdb = getRealtimeDb();
+  if (rtdb) {
+    try {
+      const q = rtdbQuery(
+        ref(rtdb, COLLECTION),
+        orderByChild('published'),
+        equalTo(true)
+      );
+      const snapshot = await get(q);
+      if (snapshot.exists()) {
+        const val = snapshot.val() as Record<string, Lesson>;
+        const remote = Object.entries(val).map(([id, data]) => ({
+          ...data,
+          id,
+          prerequisites: data.prerequisites ?? [],
+          learningObjectives: data.learningObjectives ?? [],
+          sections: data.sections ?? [],
+          examples: data.examples ?? [],
+          exercises: data.exercises ?? [],
+          exerciseIds: data.exerciseIds ?? [],
+          quizIds: data.quizIds ?? [],
+          furtherPracticeSi: data.furtherPracticeSi ?? [],
+        }));
+        return applyOverrides(mergeWithSeed(remote)).filter((l) => l.published);
+      }
+    } catch (error) {
+      console.warn('[Aura] lessonService: RTDB read fallback to seed lessons.', error);
+    }
+  }
+
   const db = getFirestoreDb();
   if (db) {
     try {
@@ -62,16 +125,43 @@ export async function fetchPublishedLessons(): Promise<Lesson[]> {
       const snapshot = await getDocs(q);
       if (!snapshot.empty) {
         const remote = snapshot.docs.map((d) => ({ ...(d.data() as Lesson), id: d.id }));
-        return applyOverrides(mergeWithSeed(remote));
+        return applyOverrides(mergeWithSeed(remote)).filter((l) => l.published);
       }
     } catch (error) {
-      console.warn('[Aura] lessonService: falling back to seed lessons.', error);
+      console.warn('[Aura] lessonService: Firestore read fallback to seed lessons.', error);
     }
   }
-  return applyOverrides(seedSorted());
+  return applyOverrides(seedSorted()).filter((l) => l.published);
 }
 
 export async function fetchAllLessonsIncludingDrafts(): Promise<Lesson[]> {
+  const rtdb = getRealtimeDb();
+  if (rtdb) {
+    try {
+      const snap = await get(ref(rtdb, COLLECTION));
+      if (snap.exists()) {
+        const val = snap.val() as Record<string, Lesson>;
+        const remote = Object.entries(val).map(([id, data]) => ({
+          ...data,
+          id,
+          prerequisites: data.prerequisites ?? [],
+          learningObjectives: data.learningObjectives ?? [],
+          sections: data.sections ?? [],
+          examples: data.examples ?? [],
+          exercises: data.exercises ?? [],
+          exerciseIds: data.exerciseIds ?? [],
+          quizIds: data.quizIds ?? [],
+          furtherPracticeSi: data.furtherPracticeSi ?? [],
+        }));
+        return applyOverrides(mergeWithSeed(remote)).sort(
+          (a, b) => a.level - b.level || a.order - b.order
+        );
+      }
+    } catch {
+      // Non-admin or offline fallback
+    }
+  }
+
   const published = await fetchPublishedLessons();
   const draftOverrides = getEditorOverrides();
   const all = new Map<string, Lesson>();
@@ -83,6 +173,9 @@ export async function fetchAllLessonsIncludingDrafts(): Promise<Lesson[]> {
   for (const lesson of published) {
     all.set(lesson.id, lesson);
   }
+  for (const custom of getCustomLessons()) {
+    all.set(custom.id, applyOverrides([custom])[0]);
+  }
   for (const draft of draftOverrides) {
     if (!all.has(draft.lessonId)) {
       const seed = seedSorted().find((l) => l.id === draft.lessonId);
@@ -93,12 +186,110 @@ export async function fetchAllLessonsIncludingDrafts(): Promise<Lesson[]> {
   return Array.from(all.values()).sort((a, b) => a.level - b.level || a.order - b.order);
 }
 
+/**
+ * Save a lesson (either edited or newly created) to local overrides + Firebase
+ * Realtime Database and/or Cloud Firestore.
+ */
+export async function saveLessonToCloud(lesson: Lesson): Promise<{
+  savedToRtdb: boolean;
+  savedToFirestore: boolean;
+}> {
+  const updated: Lesson = {
+    ...lesson,
+    updatedAt: new Date().toISOString(),
+  };
+
+  saveCustomLesson(updated);
+  saveEditorOverride({
+    lessonId: updated.id,
+    published: updated.published,
+    order: updated.order,
+    titleSi: updated.titleSi,
+    titleEn: updated.titleEn,
+    descriptionSi: updated.descriptionSi,
+    updatedAt: updated.updatedAt,
+  });
+
+  let savedToRtdb = false;
+  let savedToFirestore = false;
+
+  const rtdb = getRealtimeDb();
+  if (rtdb) {
+    try {
+      await set(ref(rtdb, `${COLLECTION}/${updated.id}`), updated);
+      savedToRtdb = true;
+    } catch (err) {
+      console.warn('[Aura] lessonService: RTDB write failed.', err);
+    }
+  }
+
+  const db = getFirestoreDb();
+  if (db) {
+    try {
+      await setDoc(doc(db, COLLECTION, updated.id), updated);
+      savedToFirestore = true;
+    } catch (err) {
+      console.warn('[Aura] lessonService: Firestore write failed.', err);
+    }
+  }
+
+  return { savedToRtdb, savedToFirestore };
+}
+
+/**
+ * Seed the bundled curriculum (courses, lessons, quizzes) into Firebase
+ * Realtime Database from an authorized admin session.
+ */
+export async function seedCurriculumToRealtimeDb(): Promise<{
+  coursesCount: number;
+  lessonsCount: number;
+  quizzesCount: number;
+}> {
+  const rtdb = getRealtimeDb();
+  if (!rtdb) {
+    throw new Error('Firebase Realtime Database සම්බන්ධ කර නොමැත.');
+  }
+
+  for (const course of SEED_COURSES) {
+    await set(ref(rtdb, `courses/${course.id}`), {
+      ...course,
+      lessonsInOrder: course.lessonIds,
+    });
+  }
+
+  for (const lesson of ALL_SEED_LESSONS) {
+    await set(ref(rtdb, `lessons/${lesson.id}`), lesson);
+  }
+
+  for (const quiz of SEED_QUIZZES) {
+    await set(ref(rtdb, `quizzes/${quiz.id}`), quiz);
+  }
+
+  return {
+    coursesCount: SEED_COURSES.length,
+    lessonsCount: ALL_SEED_LESSONS.length,
+    quizzesCount: SEED_QUIZZES.length,
+  };
+}
+
 export async function fetchLessonBySlug(slug: string): Promise<Lesson | null> {
   const all = await fetchPublishedLessons();
   return all.find((lesson) => lesson.slug === slug) ?? null;
 }
 
 export async function fetchLessonById(id: string): Promise<Lesson | null> {
+  const rtdb = getRealtimeDb();
+  if (rtdb) {
+    try {
+      const snap = await get(ref(rtdb, `${COLLECTION}/${id}`));
+      if (snap.exists()) {
+        return applyOverrides([{ ...(snap.val() as Lesson), id }])[0];
+      }
+    } catch (error) {
+      console.warn('[Aura] lessonService: RTDB get failed, using fallback.', error);
+    }
+  }
+
   const db = getFirestoreDb();
   if (db) {
     try {
@@ -107,10 +298,11 @@ export async function fetchLessonById(id: string): Promise<Lesson | null> {
         return applyOverrides([{ ...(snap.data() as Lesson), id: snap.id }])[0];
       }
     } catch (error) {
-      console.warn('[Aura] lessonService: getDoc failed, using seed data.', error);
+      console.warn('[Aura] lessonService: Firestore getDoc failed, using seed data.', error);
     }
   }
-  const seed = ALL_SEED_LESSONS.find((lesson) => lesson.id === id);
+  const seed = ALL_SEED_LESSONS.find((lesson) => lesson.id === id) ??
+    getCustomLessons().find((lesson) => lesson.id === id);
   return seed ? applyOverrides([seed])[0] : null;
 }
 
