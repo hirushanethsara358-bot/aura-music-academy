@@ -4,6 +4,29 @@ import { KeyRound, LogIn, UserPlus } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { StatusBanner } from '../../components/feedback/Feedback';
 
+function GoogleLogoSvg() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        fill="#4285F4"
+        d="M23.49 12.27c0-.79-.07-1.54-.19-2.27H12v4.51h6.47c-.29 1.48-1.14 2.73-2.4 3.58v3h3.86c2.26-2.09 3.56-5.17 3.56-8.82z"
+      />
+      <path
+        fill="#34A853"
+        d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.86-3c-1.08.72-2.45 1.16-4.07 1.16-3.13 0-5.78-2.11-6.73-4.96H1.29v3.09C3.26 21.3 7.31 24 12 24z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M5.27 14.29c-.25-.72-.38-1.49-.38-2.29s.14-1.57.38-2.29V6.62H1.29C.47 8.24 0 10.06 0 12s.47 3.76 1.29 5.38l3.98-3.09z"
+      />
+      <path
+        fill="#EA4335"
+        d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.7 1.29 6.62l3.98 3.09c.95-2.85 3.6-4.96 6.73-4.96z"
+      />
+    </svg>
+  );
+}
+
 function AuthShell({
   titleSi,
   subtitleSi,
@@ -25,16 +48,18 @@ function AuthShell({
 }
 
 export function LoginPage() {
-  const { user, login, cloudMode } = useAuth();
+  const { user, login, loginWithGoogle, cloudMode } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [googleSubmitting, setGoogleSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
 
   if (user) {
-    const redirectTo = (location.state as { from?: string } | null)?.from ?? '/my-learning';
+    const defaultTarget = user.isAdmin ? '/admin' : '/my-learning';
+    const redirectTo = (location.state as { from?: string } | null)?.from ?? defaultTarget;
     return <Navigate to={redirectTo} replace />;
   }
 
@@ -44,11 +69,25 @@ export function LoginPage() {
     setError(null);
     try {
       await login(email, password);
-      navigate('/my-learning');
+      const isAdminEmail = email.trim().toLowerCase() === 'adminaura.hirusha@auramail.com';
+      navigate(isAdminEmail ? '/admin' : '/my-learning');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'පිවිසීමේ දෝෂයක් ඇතිවිය.');
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleGoogleLogin() {
+    setGoogleSubmitting(true);
+    setError(null);
+    try {
+      await loginWithGoogle();
+      navigate('/my-learning');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Google පිවිසීමේ දෝෂයක් ඇතිවිය.');
+    } finally {
+      setGoogleSubmitting(false);
     }
   }
 
@@ -70,6 +109,33 @@ export function LoginPage() {
           </StatusBanner>
         </div>
       )}
+
+      <div style={{ display: 'grid', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
+        <button
+          type="button"
+          className="btn btn-secondary"
+          onClick={() => void handleGoogleLogin()}
+          disabled={googleSubmitting || submitting}
+          style={{ width: '100%', justifyContent: 'center' }}
+        >
+          <GoogleLogoSvg />
+          <span>{googleSubmitting ? 'Google වෙත සම්බන්ධ වෙමින්...' : 'Google හරහා ඉදිරියට යන්න (Continue with Google)'}</span>
+        </button>
+
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.6rem',
+            fontSize: '0.78rem',
+            color: 'var(--text-muted)',
+          }}
+        >
+          <span style={{ flex: 1, height: 1, background: 'var(--border-subtle)' }} />
+          <span>හෝ ඊමේල් සහ මුරපදය භාවිතයෙන්</span>
+          <span style={{ flex: 1, height: 1, background: 'var(--border-subtle)' }} />
+        </div>
+      </div>
 
       <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 'var(--space-4)' }}>
         <div className="lab-control">
@@ -98,7 +164,7 @@ export function LoginPage() {
           />
         </div>
 
-        <button type="submit" className="btn btn-primary" disabled={submitting}>
+        <button type="submit" className="btn btn-primary" disabled={submitting || googleSubmitting}>
           <LogIn size={15} aria-hidden="true" />
           {submitting ? 'පිවිසෙමින්...' : 'පිවිසෙන්න'}
         </button>
@@ -114,12 +180,13 @@ export function LoginPage() {
 }
 
 export function RegisterPage() {
-  const { user, register, cloudMode } = useAuth();
+  const { user, register, loginWithGoogle, cloudMode } = useAuth();
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [googleSubmitting, setGoogleSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
@@ -149,6 +216,19 @@ export function RegisterPage() {
     }
   }
 
+  async function handleGoogleRegister() {
+    setGoogleSubmitting(true);
+    setError(null);
+    try {
+      await loginWithGoogle();
+      navigate('/my-learning');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Google ලියාපදිංචියේ දෝෂයක් ඇතිවිය.');
+    } finally {
+      setGoogleSubmitting(false);
+    }
+  }
+
   return (
     <AuthShell
       titleSi="ලියාපදිංචි වන්න"
@@ -171,6 +251,33 @@ export function RegisterPage() {
           </StatusBanner>
         </div>
       )}
+
+      <div style={{ display: 'grid', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
+        <button
+          type="button"
+          className="btn btn-secondary"
+          onClick={() => void handleGoogleRegister()}
+          disabled={googleSubmitting || submitting}
+          style={{ width: '100%', justifyContent: 'center' }}
+        >
+          <GoogleLogoSvg />
+          <span>{googleSubmitting ? 'Google වෙත සම්බන්ධ වෙමින්...' : 'Google හරහා ඉදිරියට යන්න (Continue with Google)'}</span>
+        </button>
+
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.6rem',
+            fontSize: '0.78rem',
+            color: 'var(--text-muted)',
+          }}
+        >
+          <span style={{ flex: 1, height: 1, background: 'var(--border-subtle)' }} />
+          <span>හෝ ඊමේල් සහ මුරපදය භාවිතයෙන්</span>
+          <span style={{ flex: 1, height: 1, background: 'var(--border-subtle)' }} />
+        </div>
+      </div>
 
       <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 'var(--space-4)' }}>
         <div className="lab-control">
@@ -225,7 +332,7 @@ export function RegisterPage() {
           />
         </div>
 
-        <button type="submit" className="btn btn-primary" disabled={submitting}>
+        <button type="submit" className="btn btn-primary" disabled={submitting || googleSubmitting}>
           <UserPlus size={15} aria-hidden="true" />
           {submitting ? 'ගිණුම සාදමින්...' : 'ගිණුම සාදන්න'}
         </button>

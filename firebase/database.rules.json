@@ -4,30 +4,30 @@
     ".write": false,
 
     "admins": {
-      ".read": "auth != null && (auth.token.admin === true || root.child('admins').child(auth.uid).val() === true)",
+      ".read": "auth != null && (auth.token.admin === true || auth.uid === 'oPYN1fV1TrM7W7BcCdaU5wWOHln1' || root.child('admins').child(auth.uid).val() === true)",
       ".write": false,
       "$uid": {
-        ".read": "auth != null && (auth.uid === $uid || auth.token.admin === true || root.child('admins').child(auth.uid).val() === true)",
+        ".read": "auth != null && (auth.uid === $uid || auth.token.admin === true || auth.uid === 'oPYN1fV1TrM7W7BcCdaU5wWOHln1' || root.child('admins').child(auth.uid).val() === true)",
         ".write": false
       }
     },
 
     "courses": {
       ".indexOn": ["published", "order", "slug", "level", "category"],
-      ".read": "(query.orderByChild === 'published' && query.equalTo === true) || (auth != null && (auth.token.admin === true || root.child('admins').child(auth.uid).val() === true))",
+      ".read": "(query.orderByChild === 'published' && query.equalTo === true) || (auth != null && (auth.token.admin === true || auth.uid === 'oPYN1fV1TrM7W7BcCdaU5wWOHln1' || root.child('admins').child(auth.uid).val() === true))",
       "$courseId": {
-        ".read": "data.child('published').val() === true || (auth != null && (auth.token.admin === true || root.child('admins').child(auth.uid).val() === true))",
-        ".write": "auth != null && (auth.token.admin === true || root.child('admins').child(auth.uid).val() === true)",
+        ".read": "data.child('published').val() === true || (auth != null && (auth.token.admin === true || auth.uid === 'oPYN1fV1TrM7W7BcCdaU5wWOHln1' || root.child('admins').child(auth.uid).val() === true))",
+        ".write": "auth != null && (auth.token.admin === true || auth.uid === 'oPYN1fV1TrM7W7BcCdaU5wWOHln1' || root.child('admins').child(auth.uid).val() === true)",
         ".validate": "newData.hasChildren(['titleSi', 'titleEn', 'descriptionSi', 'published', 'order']) && newData.child('titleSi').isString() && newData.child('titleSi').val().length > 0 && newData.child('titleSi').val().length <= 200 && newData.child('titleEn').isString() && newData.child('titleEn').val().length > 0 && newData.child('titleEn').val().length <= 200 && newData.child('descriptionSi').isString() && newData.child('descriptionSi').val().length > 0 && newData.child('descriptionSi').val().length <= 4000 && newData.child('published').isBoolean() && newData.child('order').isNumber()"
       }
     },
 
     "lessons": {
       ".indexOn": ["published", "order", "slug", "courseId", "level", "category"],
-      ".read": "(query.orderByChild === 'published' && query.equalTo === true) || (auth != null && (auth.token.admin === true || root.child('admins').child(auth.uid).val() === true))",
+      ".read": "(query.orderByChild === 'published' && query.equalTo === true) || (auth != null && (auth.token.admin === true || auth.uid === 'oPYN1fV1TrM7W7BcCdaU5wWOHln1' || root.child('admins').child(auth.uid).val() === true))",
       "$lessonId": {
-        ".read": "data.child('published').val() === true || (auth != null && (auth.token.admin === true || root.child('admins').child(auth.uid).val() === true))",
-        ".write": "auth != null && (auth.token.admin === true || root.child('admins').child(auth.uid).val() === true)",
+        ".read": "data.child('published').val() === true || (auth != null && (auth.token.admin === true || auth.uid === 'oPYN1fV1TrM7W7BcCdaU5wWOHln1' || root.child('admins').child(auth.uid).val() === true))",
+        ".write": "auth != null && (auth.token.admin === true || auth.uid === 'oPYN1fV1TrM7W7BcCdaU5wWOHln1' || root.child('admins').child(auth.uid).val() === true)",
         ".validate": "newData.hasChildren(['titleSi', 'titleEn', 'slug', 'courseId', 'summarySi', 'published', 'order', 'estimatedMinutes']) && newData.child('titleSi').isString() && newData.child('titleSi').val().length > 0 && newData.child('titleSi').val().length <= 300 && newData.child('titleEn').isString() && newData.child('titleEn').val().length > 0 && newData.child('titleEn').val().length <= 300 && newData.child('slug').isString() && newData.child('slug').val().length > 0 && newData.child('slug').val().length <= 200 && newData.child('courseId').isString() && newData.child('courseId').val().length > 0 && newData.child('courseId').val().length <= 128 && newData.child('summarySi').isString() && newData.child('summarySi').val().length > 0 && newData.child('summarySi').val().length <= 4000 && newData.child('published').isBoolean() && newData.child('order').isNumber() && newData.child('estimatedMinutes').isNumber() && newData.child('estimatedMinutes').val() > 0",
         "isAdminOverride": { ".validate": false },
         "admin": { ".validate": false },
@@ -40,15 +40,15 @@
       ".read": true,
       "$quizId": {
         ".read": true,
-        ".write": "auth != null && (auth.token.admin === true || root.child('admins').child(auth.uid).val() === true)",
+        ".write": "auth != null && (auth.token.admin === true || auth.uid === 'oPYN1fV1TrM7W7BcCdaU5wWOHln1' || root.child('admins').child(auth.uid).val() === true)",
         ".validate": "newData.hasChildren(['titleSi', 'lessonId', 'questions']) && newData.child('titleSi').isString() && newData.child('titleSi').val().length > 0 && newData.child('titleSi').val().length <= 300 && newData.child('lessonId').isString() && newData.child('lessonId').val().length > 0 && newData.child('lessonId').val().length <= 128"
       }
     },
 
     "users": {
       "$uid": {
-        ".read": "auth != null && (auth.uid === $uid || auth.token.admin === true || root.child('admins').child(auth.uid).val() === true)",
-        ".write": "auth != null && (auth.uid === $uid || auth.token.admin === true || root.child('admins').child(auth.uid).val() === true)",
+        ".read": "auth != null && (auth.uid === $uid || auth.token.admin === true || auth.uid === 'oPYN1fV1TrM7W7BcCdaU5wWOHln1' || root.child('admins').child(auth.uid).val() === true)",
+        ".write": "auth != null && (auth.uid === $uid || auth.token.admin === true || auth.uid === 'oPYN1fV1TrM7W7BcCdaU5wWOHln1' || root.child('admins').child(auth.uid).val() === true)",
         ".validate": "newData.hasChildren(['uid', 'email', 'displayName']) && newData.child('uid').val() === $uid && newData.child('email').isString() && newData.child('email').val().length > 0 && newData.child('email').val().length <= 320 && newData.child('displayName').isString() && newData.child('displayName').val().length > 0 && newData.child('displayName').val().length <= 120",
         "role": { ".validate": false },
         "admin": { ".validate": false },
@@ -61,9 +61,9 @@
 
     "userProgress": {
       "$uid": {
-        ".read": "auth != null && (auth.uid === $uid || auth.token.admin === true || root.child('admins').child(auth.uid).val() === true)",
+        ".read": "auth != null && (auth.uid === $uid || auth.token.admin === true || auth.uid === 'oPYN1fV1TrM7W7BcCdaU5wWOHln1' || root.child('admins').child(auth.uid).val() === true)",
         "$lessonId": {
-          ".write": "auth != null && (auth.uid === $uid || auth.token.admin === true || root.child('admins').child(auth.uid).val() === true)",
+          ".write": "auth != null && (auth.uid === $uid || auth.token.admin === true || auth.uid === 'oPYN1fV1TrM7W7BcCdaU5wWOHln1' || root.child('admins').child(auth.uid).val() === true)",
           ".validate": "newData.hasChildren(['uid', 'lessonId', 'completed']) && newData.child('uid').val() === $uid && newData.child('lessonId').val() === $lessonId && newData.child('completed').isBoolean()",
           "role": { ".validate": false },
           "admin": { ".validate": false },
@@ -76,9 +76,9 @@
 
     "userBookmarks": {
       "$uid": {
-        ".read": "auth != null && (auth.uid === $uid || auth.token.admin === true || root.child('admins').child(auth.uid).val() === true)",
+        ".read": "auth != null && (auth.uid === $uid || auth.token.admin === true || auth.uid === 'oPYN1fV1TrM7W7BcCdaU5wWOHln1' || root.child('admins').child(auth.uid).val() === true)",
         "$lessonId": {
-          ".write": "auth != null && (auth.uid === $uid || auth.token.admin === true || root.child('admins').child(auth.uid).val() === true) && (!newData.exists() || !data.exists())",
+          ".write": "auth != null && (auth.uid === $uid || auth.token.admin === true || auth.uid === 'oPYN1fV1TrM7W7BcCdaU5wWOHln1' || root.child('admins').child(auth.uid).val() === true) && (!newData.exists() || !data.exists())",
           ".validate": "newData.hasChildren(['uid', 'lessonId', 'createdAt']) && newData.child('uid').val() === $uid && newData.child('lessonId').val() === $lessonId",
           "$other": {
             ".validate": "$other === 'uid' || $other === 'lessonId' || $other === 'createdAt'"
@@ -90,7 +90,7 @@
     "quizAttempts": {
       "$uid": {
         ".indexOn": ["createdAt", "quizId", "lessonId"],
-        ".read": "auth != null && (auth.uid === $uid || auth.token.admin === true || root.child('admins').child(auth.uid).val() === true)",
+        ".read": "auth != null && (auth.uid === $uid || auth.token.admin === true || auth.uid === 'oPYN1fV1TrM7W7BcCdaU5wWOHln1' || root.child('admins').child(auth.uid).val() === true)",
         "$attemptId": {
           ".write": "auth != null && auth.uid === $uid && !data.exists() && newData.exists()",
           ".validate": "newData.hasChildren(['uid', 'quizId', 'lessonId', 'score', 'totalQuestions', 'percentage', 'passed', 'createdAt']) && newData.child('uid').val() === $uid && newData.child('quizId').isString() && newData.child('quizId').val().length > 0 && newData.child('quizId').val().length <= 128 && newData.child('score').isNumber() && newData.child('score').val() >= 0 && newData.child('totalQuestions').isNumber() && newData.child('totalQuestions').val() > 0 && newData.child('score').val() <= newData.child('totalQuestions').val() && newData.child('percentage').isNumber() && newData.child('percentage').val() >= 0 && newData.child('percentage').val() <= 100 && newData.child('passed').isBoolean()",
@@ -102,9 +102,9 @@
     },
 
     "adminAuditLogs": {
-      ".read": "auth != null && (auth.token.admin === true || root.child('admins').child(auth.uid).val() === true)",
+      ".read": "auth != null && (auth.token.admin === true || auth.uid === 'oPYN1fV1TrM7W7BcCdaU5wWOHln1' || root.child('admins').child(auth.uid).val() === true)",
       "$logId": {
-        ".write": "auth != null && (auth.token.admin === true || root.child('admins').child(auth.uid).val() === true) && !data.exists() && newData.exists()",
+        ".write": "auth != null && (auth.token.admin === true || auth.uid === 'oPYN1fV1TrM7W7BcCdaU5wWOHln1' || root.child('admins').child(auth.uid).val() === true) && !data.exists() && newData.exists()",
         ".validate": "newData.hasChildren(['action', 'targetId']) && newData.child('action').isString() && newData.child('action').val().length > 0 && newData.child('action').val().length <= 200 && newData.child('targetId').isString() && newData.child('targetId').val().length > 0 && newData.child('targetId').val().length <= 200"
       }
     }

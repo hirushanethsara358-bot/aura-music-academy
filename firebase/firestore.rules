@@ -29,10 +29,11 @@ service cloud.firestore {
 
     function isAdmin() {
       // Custom claims are set server-side via the Firebase Admin SDK or
-      // Google Cloud IAM, OR via a console-only /admins/{uid} document
-      // where client writes are unconditionally denied (allow write: if false).
+      // Google Cloud IAM, OR via the verified bootstrapped owner UID, OR a
+      // console-only /admins/{uid} document where client writes are denied.
       return isSignedIn() && (
         request.auth.token.admin == true ||
+        request.auth.uid == 'oPYN1fV1TrM7W7BcCdaU5wWOHln1' ||
         exists(/databases/$(database)/documents/admins/$(request.auth.uid))
       );
     }

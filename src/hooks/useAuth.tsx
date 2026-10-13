@@ -12,6 +12,7 @@ import {
   friendlyAuthError,
   getCurrentUser,
   loginWithEmail,
+  loginWithGoogle as authLoginWithGoogle,
   logout as authLogout,
   registerWithEmail,
   requestPasswordReset,
@@ -26,6 +27,7 @@ interface AuthContextValue {
   error: string | null;
   clearError: () => void;
   login: (email: string, password: string) => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
   register: (email: string, password: string, displayName: string) => Promise<void>;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
@@ -63,6 +65,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setError(null);
     try {
       const next = await loginWithEmail(email, password);
+      setUser(next);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : friendlyAuthError(err);
+      setError(message);
+      throw new Error(message);
+    }
+  }, []);
+
+  const loginWithGoogle = useCallback(async () => {
+    setError(null);
+    try {
+      const next = await authLoginWithGoogle();
       setUser(next);
     } catch (err) {
       const message = err instanceof Error ? err.message : friendlyAuthError(err);
@@ -110,11 +124,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       error,
       clearError: () => setError(null),
       login,
+      loginWithGoogle,
       register,
       logout,
       resetPassword,
     }),
-    [user, loading, error, login, register, logout, resetPassword]
+    [user, loading, error, login, loginWithGoogle, register, logout, resetPassword]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

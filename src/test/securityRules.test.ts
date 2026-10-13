@@ -601,6 +601,16 @@ describe('Firebase Realtime Database Security Rules (database.rules.json)', () =
         newData: validLesson,
       })
     ).toBe(true);
+
+    // Bootstrapped primary owner UID (oPYN1fV1TrM7W7BcCdaU5wWOHln1)
+    expect(
+      evaluateRtdbRule({
+        auth: userAuth('oPYN1fV1TrM7W7BcCdaU5wWOHln1', false),
+        path: '/lessons/lesson-101',
+        operation: 'write',
+        newData: validLesson,
+      })
+    ).toBe(true);
   });
 
   it('enforces cross-user isolation on /users, /userProgress, /userBookmarks, and /quizAttempts', () => {

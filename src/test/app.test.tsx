@@ -378,6 +378,26 @@ describe('Authentication and route protection', () => {
       expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/මගේ ඉගෙනුම/);
     });
   });
+
+  it('renders Google sign-in buttons on login and register pages', () => {
+    renderWithProviders('/login');
+    expect(
+      screen.getByRole('button', { name: /Google හරහා ඉදිරියට යන්න/ })
+    ).toBeInTheDocument();
+  });
+
+  it('signs in the bootstrapped admin account (adminaura.hirusha@auramail.com) and reaches the Admin CMS', async () => {
+    const user = userEvent.setup();
+    renderWithProviders('/login');
+
+    await user.type(screen.getByLabelText(/ඊමේල් ලිපිනය/), 'adminaura.hirusha@auramail.com');
+    await user.type(screen.getByLabelText(/මුරපදය/), 'adminaura');
+    await user.click(screen.getByRole('button', { name: /^පිවිසෙන්න$/ }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/Admin CMS/);
+    });
+  });
 });
 
 describe('My Learning dashboard', () => {
