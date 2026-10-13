@@ -250,4 +250,217 @@ export const SEED_LESSONS_COMPLETION: Lesson[] = [
     order: 1,
     updatedAt: UPDATED_AT,
   },
+  {
+    id: 'lesson-104',
+    slug: 'piano-posture-fingering-and-octave-navigation',
+    courseId: 'course-level-1',
+    titleSi: 'පියානෝ වාදන ඉරියව්, ඇඟිලි අංකනය (1–5 Fingering) සහ ඔක්ටේව් හැසිරවීම',
+    titleEn: 'Piano Posture, 1–5 Fingering and Octave Navigation',
+    descriptionSi:
+      'නිවැරදි පියානෝ වාදන ඉරියව්, දකුණු සහ වම් අත් සඳහා සම්මත 1–5 ඇඟිලි අංකනය (Fingering), Thumb Under ක්‍රමවේදය, Enharmonic Notes සහ ඔක්ටේව් පරාස අතර සුමටව ගමන් කිරීම.',
+    category: 'music-foundations',
+    level: 1,
+    prerequisites: ['staff-notation-rhythm-and-time-signatures'],
+    estimatedMinutes: 22,
+    learningObjectives: [
+      'දකුණු සහ වම් අත් දෙකෙහිම 1 සිට 5 දක්වා සම්මත ඇඟිලි අංකනය (Finger Numbers) නිවැරදිව හඳුනා ගැනීම.',
+      'Thumb Under සහ Finger Over ක්‍රමවේද භාවිතයෙන් C Major පංච-ස්වර සහ සම්පූර්ණ ඔක්ටේව් මාලාව වාදනය කිරීම.',
+      'Enharmonic ස්වර (උදා: C# = Db, F# = Gb) යතුරු පුවරුව මත ක්ෂණිකව සොයා ගැනීම.',
+      'Virtual Piano සහ DAW Piano Roll අතර සම්බන්ධතාව තේරුම් ගැනීම.',
+    ],
+    sections: [
+      {
+        id: 's-104-1',
+        headingSi: 'සම්මත ඇඟිලි අංකනය (1–5 Piano Fingering)',
+        headingEn: 'Standard 1–5 Piano Fingering',
+        bodySi:
+          'පියානෝ වාදනයේදී අත් දෙකෙහිම ඇඟිලි සඳහා ජාත්‍යන්තරව එකම අංක 1 සිට 5 දක්වා භාවිතා වේ. මහපට ඇඟිල්ල (Thumb) සැමවිටම 1 වන අතර, දබර ඇඟිල්ල 2, මැද ඇඟිල්ල 3, වෙද ඇඟිල්ල 4 සහ සුළැඟිල්ල (Pinky) 5 ලෙස අංකනය කෙරේ. මෙම අංක Sheet Music වල ස්වරවලට ඉහළින් හෝ පහළින් කුඩා ඉලක්කම් ලෙස දැක්වේ.',
+        keyTerms: [
+          { termEn: 'Fingering (1–5)', termSi: 'ඇඟිලි අංකනය', definitionSi: 'මහපට ඇඟිල්ලේ (1) සිට සුළැඟිල්ල (5) දක්වා සම්මත අංක කිරීම.' },
+          { termEn: 'Thumb Under', termSi: 'මහපට ඇඟිල්ල යටින් ගෙන යාම', definitionSi: 'ස්වර 5 කට වඩා වැඩි මාලාවක් සුමටව වාදනය කිරීමට 3 වන ඇඟිල්ල යටින් 1 වන ඇඟිල්ල ගෙන යාම.' },
+        ],
+        formulaOrDiagram:
+          'ඇඟිලි අංකනය (අත් දෙකටම පොදුයි):\n\n1 = මහපට ඇඟිල්ල (Thumb)\n2 = දබර ඇඟිල්ල (Index)\n3 = මැද ඇඟිල්ල (Middle)\n4 = වෙද ඇඟිල්ල (Ring)\n5 = සුළැඟිල්ල (Little / Pinky)\n\nC Major Scale (දකුණු අත ඉහළට):  C(1) - D(2) - E(3) - F(1) - G(2) - A(3) - B(4) - C(5)',
+      },
+      {
+        id: 's-104-2',
+        headingSi: 'Enharmonic Notes සහ ඔක්ටේව් අංකනය (C0–C8)',
+        headingEn: 'Enharmonic Equivalents and Scientific Pitch Notation',
+        bodySi:
+          'පියානෝවේ එකම කළු යතුරකට නම් දෙකක් තිබිය හැක. C ට අර්ධ ස්වරයක් ඉහළින් ඇති යතුර C# (C Sharp) ලෙසත්, D ට අර්ධ ස්වරයක් පහළින් ඇති නිසා Db (D Flat) ලෙසත් හැඳින්වේ. ශබ්දය (Frequency) එකම වුවද, ගීතයේ Key Signature එක අනුව නිවැරදි නම තෝරා ගැනේ. එසේම Middle C ස්වරය Scientific Pitch Notation අනුව C4 (261.63 Hz) ලෙස හැඳින්වේ.',
+        keyTerms: [
+          { termEn: 'Enharmonic Equivalent', termSi: 'සම-ශබ්ද ස්වර', definitionSi: 'එකම සංඛ්‍යාතය ඇති නමුත් සංගීත න්‍යාය අනුව නම් දෙකකින් ලියන ස්වර (උදා: F# සහ Gb).' },
+          { termEn: 'Scientific Pitch Notation', termSi: 'විද්‍යාත්මක ස්වර අංකනය', definitionSi: 'ස්වර නාමය සමඟ ඔක්ටේව් අංකය දැක්වීම (උදා: A4 = 440 Hz, C4 = Middle C).' },
+        ],
+      },
+    ],
+    examples: [
+      {
+        id: 'ex-104-1',
+        titleSi: 'C4 සිට C5 දක්වා සම්පූර්ණ ඔක්ටේව් මාලාව',
+        titleEn: 'Full Octave Scale C4 to C5',
+        descriptionSi: '1-2-3-1-2-3-4-5 ඇඟිලි රටාව අනුව C4 සිට C5 දක්වා ස්වර 8 අසන්න.',
+        notationOrSteps: 'C4(1) → D4(2) → E4(3) → F4(1) → G4(2) → A4(3) → B4(4) → C5(5)',
+        synthPreviewNotes: [60, 62, 64, 65, 67, 69, 71, 72],
+        synthType: 'melody',
+      },
+    ],
+    exercises: [
+      {
+        id: 'exer-104-1',
+        titleSi: 'Virtual Piano මත ඔක්ටේව් සහ Enharmonic පුහුණුව',
+        instructionsSi: 'Virtual Piano Lab විවෘත කර පහත පියවර අනුගමනය කරන්න.',
+        stepsSi: [
+          'ආරම්භක ඔක්ටේව් C3 සහ C4 ලෙස මාරු කරමින් C4 (Middle C) හඳුනා ගන්න.',
+          'C#4 / Db4 සහ F#4 / Gb4 යතුරු වාදනය කර ඒවායේ ශබ්දයට සවන් දෙන්න.',
+          'C4 සිට G4 දක්වා පංච-ස්වර රටාව (C-D-E-F-G-F-E-D-C) සමාන වේගයකින් වාදනය කරන්න.',
+        ],
+        linkedLabTab: 'piano',
+      },
+    ],
+    exerciseIds: ['exer-104-1'],
+    quizIds: ['quiz-104'],
+    summarySi:
+      'පියානෝ ඇඟිලි අංකනයේදී මහපට ඇඟිල්ල 1 වන අතර සුළැඟිල්ල 5 වේ. Thumb Under ක්‍රමයෙන් සම්පූර්ණ ඔක්ටේව් මාලාවක් සුමටව වාදනය කළ හැක. එකම ශබ්දයට නම් දෙකක් තිබීම Enharmonic ලෙස හැඳින්වේ.',
+    furtherPracticeSi: [
+      'දකුණු අතෙන් C Major ඔක්ටේව් මාලාව ඉහළට සහ පහළට (5-4-3-2-1-3-2-1) පුහුණු වන්න.',
+    ],
+    published: true,
+    order: 4,
+    updatedAt: UPDATED_AT,
+  },
+  {
+    id: 'lesson-204',
+    slug: 'modes-of-the-major-scale-and-ear-training',
+    courseId: 'course-level-2',
+    titleSi: 'මේජර් ස්වර මාලාවේ Modes 7 (Ionian සිට Locrian දක්වා) සහ කන් පුහුණුව',
+    titleEn: 'The Seven Modes of the Major Scale and Ear Training',
+    descriptionSi:
+      'Ionian, Dorian, Phrygian, Lydian, Mixolydian, Aeolian සහ Locrian යන Modes 7 හි සූත්‍ර, ඒවායේ ලාක්ෂණික ස්වර (Characteristic Notes) සහ ශ්‍රවණයෙන් හඳුනා ගැනීම.',
+    category: 'music-theory',
+    level: 2,
+    prerequisites: ['diatonic-harmony-roman-numerals-and-circle-of-fifths'],
+    estimatedMinutes: 26,
+    learningObjectives: [
+      'Major Scale එකේ ස්වර 7 මත ගොඩනැගෙන Modes 7 නිවැරදි පිළිවෙලින් නම් කිරීම.',
+      'Major-type Modes (Ionian, Lydian, Mixolydian) සහ Minor-type Modes (Dorian, Phrygian, Aeolian) වෙන් කර හඳුනා ගැනීම.',
+      'Dorian (#6 / natural 6) සහ Lydian (#4) වැනි ලාක්ෂණික ස්වර ශ්‍රවණයෙන් හඳුනා ගැනීම.',
+    ],
+    sections: [
+      {
+        id: 's-204-1',
+        headingSi: 'Modes 7 යනු කුමක්ද?',
+        headingEn: 'Understanding the Seven Diatonic Modes',
+        bodySi:
+          'C Major ස්වර මාලාවේ (C D E F G A B) සෑම ස්වරයක්ම ආරම්භක මධ්‍යස්ථානය (Tonal Center) ලෙස ගත් විට එකිනෙකට වෙනස් චිත්තවේගීය වර්ණ 7 ක් ලැබේ. මේවා Modes 7 ලෙස හැඳින්වේ. නවීන සිනමා සංගීතය, Jazz, Rock සහ Fusion නිර්මාණවල මෙම Modes ඉතා පුළුල්ව භාවිතා වේ.',
+        keyTerms: [
+          { termEn: 'Dorian Mode', termSi: 'ඩෝරියන් මෝඩය', definitionSi: '2 වන ස්වරයෙන් ඇරඹෙන Minor මෝඩය (1 - 2 - b3 - 4 - 5 - 6 - b7). Natural 6th ස්වරය නිසා දීප්තිමත් Minor හැඟීමක් දෙයි.' },
+          { termEn: 'Lydian Mode', termSi: 'ලිඩියන් මෝඩය', definitionSi: '4 වන ස්වරයෙන් ඇරඹෙන Major මෝඩය (1 - 2 - 3 - #4 - 5 - 6 - 7). #4 ස්වරය සිහිනමය/සිනමාත්මක හැඟීමක් ලබා දෙයි.' },
+          { termEn: 'Mixolydian Mode', termSi: 'මික්සොලිඩියන් මෝඩය', definitionSi: '5 වන ස්වරයෙන් ඇරඹෙන Major මෝඩය (1 - 2 - 3 - 4 - 5 - 6 - b7). Rock, Blues සහ ජන සංගීතයේ බහුලයි.' },
+        ],
+        formulaOrDiagram:
+          'Modes 7 හි සූත්‍ර (Parallel සංසන්දනය):\n\n1. Ionian (Major)   : 1  2  3   4   5  6   7\n2. Dorian           : 1  2  b3  4   5  6   b7  (ලාක්ෂණික ස්වරය: Natural 6)\n3. Phrygian         : 1  b2 b3  4   5  b6  b7  (ලාක්ෂණික ස්වරය: b2)\n4. Lydian           : 1  2  3   #4  5  6   7   (ලාක්ෂණික ස්වරය: #4)\n5. Mixolydian       : 1  2  3   4   5  6   b7  (ලාක්ෂණික ස්වරය: b7)\n6. Aeolian (Minor)  : 1  2  b3  4   5  b6  b7\n7. Locrian          : 1  b2 b3  4   b5 b6  b7  (ලාක්ෂණික ස්වරය: b5)',
+      },
+    ],
+    examples: [
+      {
+        id: 'ex-204-1',
+        titleSi: 'D Dorian ස්වර මාලාව (D E F G A B C D)',
+        titleEn: 'D Dorian Scale Preview',
+        descriptionSi: 'Natural Minor එකට වඩා B (Natural 6th) ස්වරය නිසා ලැබෙන විශේෂ වර්ණයට සවන් දෙන්න.',
+        notationOrSteps: 'D4 → E4 → F4 → G4 → A4 → B4 (Natural 6) → C5 → D5',
+        synthPreviewNotes: [62, 64, 65, 67, 69, 71, 72, 74],
+        synthType: 'melody',
+      },
+    ],
+    exercises: [
+      {
+        id: 'exer-204-1',
+        titleSi: 'Scale Explorer සහ Ear Training මගින් Modes පරීක්ෂාව',
+        instructionsSi: 'Scale Explorer තුළ Dorian, Lydian සහ Mixolydian තෝරා ශබ්ද සංසන්දනය කරන්න.',
+        stepsSi: [
+          'Scale Explorer හි Root = C ලෙස තබා C Major (Ionian) සහ C Mixolydian අසන්න.',
+          'C Natural Minor (Aeolian) සහ C Dorian අතර 6 වන ස්වරයේ වෙනස හඳුනා ගන්න.',
+          'Ear Training Lab වෙත ගොස් Interval සහ Scale ශ්‍රවණ අභ්‍යාස 5 ක් සම්පූර්ණ කරන්න.',
+        ],
+        linkedLabTab: 'scales',
+      },
+    ],
+    exerciseIds: ['exer-204-1'],
+    quizIds: ['quiz-204'],
+    summarySi:
+      'Major Scale එකේ ස්වර 7 ඇසුරින් Ionian, Dorian, Phrygian, Lydian, Mixolydian, Aeolian සහ Locrian යන Modes 7 ගොඩනැගේ. එක් එක් Mode එකේ ලාක්ෂණික ස්වරය (උදා: Lydian හි #4, Dorian හි Natural 6) එහි අනන්‍ය හැඟීම තීරණය කරයි.',
+    furtherPracticeSi: [
+      'C Lydian (C D E F# G A B) ස්වර මාලාව භාවිතයෙන් කෙටි සිනමාත්මක තනුවක් නිර්මාණය කරන්න.',
+    ],
+    published: true,
+    order: 4,
+    updatedAt: UPDATED_AT,
+  },
+  {
+    id: 'lesson-703',
+    slug: 'vocal-and-drum-bus-mixing-parallel-compression',
+    courseId: 'course-level-7',
+    titleSi: 'Vocal සහ Drum Bus මිශ්‍රණය, De-essing සහ Parallel Compression',
+    titleEn: 'Vocal & Drum Bus Mixing, De-essing and Parallel Compression',
+    descriptionSi:
+      'ප්‍රධාන ගායනය (Lead Vocal) පැහැදිලිව ඉදිරියට ගැනීම, Sibilance (4–9 kHz) පාලනයට De-esser භාවිතය, Serial Compression සහ Drums සඳහා Parallel (New York) Compression ක්‍රමවේදය.',
+    category: 'mixing',
+    level: 7,
+    prerequisites: ['compression-reverb-and-stereo-imaging'],
+    estimatedMinutes: 28,
+    learningObjectives: [
+      'Vocal Signal Chain එකක (HPF → Subtractive EQ → Compressor → De-esser → Send Effects) තාර්කික අනුපිළිවෙල පැහැදිලි කිරීම.',
+      'Sibilance ("ස්", "ෂ්" ශබ්ද) 4 kHz – 9 kHz පරාසයේදී De-esser මගින් පාලනය කිරීම.',
+      'Drum Bus එකක Transients විනාශ නොකර බලය වැඩි කිරීමට Parallel Compression යොදා ගැනීම.',
+    ],
+    sections: [
+      {
+        id: 's-703-1',
+        headingSi: 'Lead Vocal Signal Chain සහ De-essing',
+        headingEn: 'Lead Vocal Signal Chain and Sibilance Control',
+        bodySi:
+          'ගීතයක වඩාත්ම වැදගත් අංගය බොහෝ විට ප්‍රධාන ගායනයයි (Lead Vocal). පළමුව High-Pass Filter (80–100 Hz) මගින් අනවශ්‍ය ගැඹුරු ඝෝෂාව ඉවත් කරන්න. ඉන්පසු අනවශ්‍ය අනුනාද (Resonances) Subtractive EQ මගින් අඩු කර, Compressor මගින් Dynamic Range සමතුලිත කරන්න. "S" සහ "Sh" වැනි තියුණු Sibilance ශබ්ද බොහෝ විට 5 kHz සිට 8 kHz අතර පවතින අතර, De-esser එකක් මගින් එම සංඛ්‍යාතය පමණක් වැඩි වන මොහොතේදී 3–6 dB පමණ මෘදුව පාලනය කළ හැක.',
+        keyTerms: [
+          { termEn: 'Sibilance', termSi: 'තියුණු සිසිල් ශබ්ද (S/Sh)', definitionSi: 'ගායනයේදී 4 kHz – 9 kHz අතර ප්‍රබලව ඇසෙන තියුණු "ස්/ෂ්" ශබ්ද.' },
+          { termEn: 'De-esser', termSi: 'ඩී-එසර්', definitionSi: 'Sibilance සංඛ්‍යාත පරාසයට පමණක් ක්‍රියාත්මක වන Frequency-dependent Compressor එකක්.' },
+          { termEn: 'Parallel Compression', termSi: 'සමාන්තර සම්පීඩනය', definitionSi: 'සම්පීඩනය නොකළ මුල් සංඥාව (Dry) සමඟ දැඩි ලෙස සම්පීඩනය කළ සංඥාවක් (Wet) මිශ්‍ර කිරීම.' },
+        ],
+        formulaOrDiagram:
+          'Vocal Chain ආදර්ශ පිළිවෙල:\n\nMic Input → Clip Gain → HPF (80–100 Hz) → Subtractive EQ → Compressor (3–5 dB GR) → De-esser (5–8 kHz) → Reverb/Delay Sends\n\nParallel Drum Compression:\nDrum Bus (Dry Transients) ──┬──► Mix Bus\n                            └──► Aux Send → Heavy Compressor (8:1, Fast Attack) ──▲ (Blend -12 dB)',
+      },
+    ],
+    examples: [
+      {
+        id: 'ex-703-1',
+        titleSi: 'Serial සහ Parallel Compression සංසන්දනය',
+        titleEn: 'Serial vs Parallel Compression',
+        descriptionSi: 'ප්‍රබල Peaks පාලනයට වේගවත් Compressor එකක් සහ සමස්ත මට්ටම සුමට කිරීමට දෙවන Compressor එකක් යෙදීම.',
+        notationOrSteps:
+          '1. 1st Compressor (Peak Catcher) : Ratio 4:1, Fast Attack (3 ms), Fast Release → 2–3 dB Gain Reduction\n2. 2nd Compressor (Leveller)     : Ratio 2:1, Medium Attack (20 ms), Auto Release → 2 dB Gain Reduction',
+      },
+    ],
+    exercises: [
+      {
+        id: 'exer-703-1',
+        titleSi: 'EQ Lab තුළ Vocal Sibilance සහ Air පරාස පරීක්ෂාව',
+        instructionsSi: 'Parametric EQ Lab විවෘත කර ඉහළ මැද සංඛ්‍යාත පරාසයට සවන් දෙන්න.',
+        stepsSi: [
+          'High Band හෝ Mid Band භාවිතයෙන් 5 kHz – 7 kHz පරාසය +6 dB කින් වැඩි කර තියුණු බව හඳුනා ගන්න.',
+          'එම පරාසය -3 dB කින් අඩු කර ශබ්දය මෘදු වන ආකාරය නිරීක්ෂණය කරන්න.',
+        ],
+        linkedLabTab: 'eq',
+      },
+    ],
+    exerciseIds: ['exer-703-1'],
+    quizIds: ['quiz-703'],
+    summarySi:
+      'Lead Vocal මිශ්‍රණයේදී HPF, Subtractive EQ, Compression සහ De-essing නිසි අනුපිළිවෙලට යෙදීමෙන් පැහැදිලි හඬක් ලැබේ. Parallel Compression මගින් මුල් Transients ආරක්ෂා කරමින්ම ශබ්දයේ ඝනත්වය (Density) වැඩි කළ හැක.',
+    furtherPracticeSi: [
+      'ඔබේ DAW එකේ Drum Bus එකට Aux Track එකක් හරහා Parallel Compressor එකක් යොදා Dry/Wet සමබරතාව පරීක්ෂා කරන්න.',
+    ],
+    published: true,
+    order: 3,
+    updatedAt: UPDATED_AT,
+  },
 ];

@@ -48,6 +48,16 @@ before merge. Rules changes additionally require the review checklist in
 
 ---
 
+## Delivered in v1.1.0 (2026-10-13)
+
+- **Firebase Realtime Database (`https://auramusic-daa98-default-rtdb.asia-southeast1.firebasedatabase.app/`) + Cloud Firestore Dual-Engine Support** across all services (`firebase.ts`, `authService.ts`, `courseService.ts`, `lessonService.ts`, `progressService.ts`, `quizService.ts`).
+- **Realtime Database Security Rules (`firebase/database.rules.json`) + Simulator (`src/lib/rtdbRulesSimulator.ts`)** with default-deny root rules, query-enforced public reads, strict per-UID isolation, immutable quiz attempts, and console-only `/admins/{uid}` (`".write": false`) alongside Custom Claims.
+- **Interactive Firebase & Security Rules Center (`FirebaseRulesPanel.tsx`)** in `/about#firebase-rules` and `/admin`.
+- **Full Lesson Creation & Course Editing in Admin CMS** + one-click Realtime Database curriculum seeding (`npm run seed:rtdb`).
+- **Expanded Curriculum**: 24 authored Sinhala lessons and 24 quizzes across all 9 levels.
+
+---
+
 ## Delivered in v1.0.0
 
 **Foundation** — React 18 + TypeScript strict + Vite 6, DAW-inspired dual theme,

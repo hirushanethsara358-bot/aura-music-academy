@@ -1,9 +1,10 @@
 import { Link } from 'react-router-dom';
 import { AlertTriangle, CheckCircle2, Database, Lock, ShieldCheck, Star } from 'lucide-react';
+import { FirebaseRulesPanel } from '../admin/FirebaseRulesPanel';
 
 export function AboutPage() {
   return (
-    <div style={{ display: 'grid', gap: 'var(--space-6)', maxWidth: 900 }}>
+    <div style={{ display: 'grid', gap: 'var(--space-6)', maxWidth: 940 }}>
       <header>
         <h1 style={{ marginBottom: '0.35rem' }}>Aura Music Academy ගැන</h1>
         <p style={{ color: 'var(--text-muted)' }}>
@@ -40,6 +41,9 @@ export function AboutPage() {
         </ol>
       </section>
 
+      {/* Interactive Firebase Realtime Database & Firestore Security Rules Center */}
+      <FirebaseRulesPanel />
+
       <section className="surface-card" id="limitations" style={{ borderLeft: '4px solid var(--accent-amber)' }}>
         <h2 style={{ fontSize: '1.05rem' }}>
           <AlertTriangle size={18} style={{ verticalAlign: '-3px', marginRight: 6 }} aria-hidden="true" />
@@ -59,11 +63,7 @@ export function AboutPage() {
           </li>
           <li>
             Offline Cloud Synchronisation — අපි එය ක්‍රියාත්මක කර ඇති බව ප්‍රකාශ නොකරමු. දැනට
-            දත්ත ඔබේ බ්‍රවුසරයේ හෝ Firebase Firestore හි සුරැකේ.
-          </li>
-          <li>
-            Admin CMS හි නව පාඩමක් සම්පූර්ණයෙන්ම (අන්තර්ගතය සමඟ) සෑදීම — දැනට පවතින පාඩම්
-            සංස්කරණය, පිළිවෙල සහ ප්‍රකාශන තත්ත්වය කළමනාකරණය කළ හැක.
+            දත්ත ඔබේ බ්‍රවුසරයේ හෝ Firebase Realtime Database / Firestore හි සුරැකේ.
           </li>
         </ul>
       </section>
@@ -92,15 +92,18 @@ export function AboutPage() {
           ආරක්ෂණ ආකෘතිය
         </h2>
         <ul style={{ color: 'var(--text-secondary)', fontSize: '0.92rem' }}>
-          <li>Firestore Security Rules සියලු ප්‍රවේශ අවසර දෙන්නේ නිශ්චිතව ප්‍රකාශ කළ දේ පමණි — ඉතිරි සියල්ල ප්‍රතික්ෂේප වේ (Default Deny).</li>
+          <li>
+            Firebase Realtime Database (<code>firebase/database.rules.json</code>) සහ Firestore
+            Security Rules (<code>firebase/firestore.rules</code>) සියලු ප්‍රවේශ අවසර දෙන්නේ
+            නිශ්චිතව ප්‍රකාශ කළ දේ පමණි — ඉතිරි සියල්ල ප්‍රතික්ෂේප වේ (Default Deny).
+          </li>
           <li>පරිශීලකයෙකුට තමන්ටම Admin අවසර ලබාගත නොහැක.</li>
-          <li>Admin අවසර ලබා දෙන්නේ Firebase Auth Custom Claim එකක් මගින් සේවාදායකයෙන් පමණි.</li>
+          <li>
+            Admin අවසර ලබා දෙන්නේ Firebase Auth Custom Claim එකක් මගින් හෝ Console එකෙන් පමණක්
+            ලිවිය හැකි <code>/admins/{'{uid}'}</code> මගිනි.
+          </li>
           <li>කිසිදු Admin Service-Account යතුරක් හෝ රහසක් Frontend කේතයේ හෝ GitHub හි නොමැත.</li>
         </ul>
-        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 0 }}>
-          <strong>වැදගත්:</strong> තාක්ෂණික විස්තර <code>docs/SECURITY.md</code> සහ{' '}
-          <code>firebase/firestore.rules</code> හි ඇත.
-        </p>
       </section>
 
       <section className="surface-card">
@@ -109,21 +112,18 @@ export function AboutPage() {
           ප්‍රථම Admin පරිපාලක නිර්මාණය කිරීම
         </h2>
         <ol style={{ color: 'var(--text-secondary)', fontSize: '0.92rem' }}>
-          <li>Firebase Console එකට ගොස් Authentication හි පරිශීලකයා නිර්මාණය කරන්න.</li>
+          <li>වෙබ් අඩවියේ හෝ Firebase Console හි Authentication තුළ ඔබේ ගිණුම නිර්මාණය කරන්න.</li>
           <li>
-            Firebase Admin SDK (හෝ Google Cloud Console IAM) භාවිතයෙන් එම uid සඳහා Custom Claim
-            එකක් සකසන්න: <code>{'{ admin: true }'}</code>.
+            <strong>ක්‍රමය A (Firebase Console — පහසුම ක්‍රමය):</strong> Firebase Console →
+            Realtime Database → Data වෙත ගොස් <code>/admins/&lt;ඔබේ_UID&gt;: true</code> ලෙස
+            ඇතුළත් කරන්න. <code>/admins</code> සඳහා බ්‍රවුසරයෙන් ලිවීම සම්පූර්ණයෙන්ම අවහිර කර ඇත (
+            <code>&quot;.write&quot;: false</code>).
           </li>
-          <li>පරිශීලකයා නැවත පිවිසෙන විට නව Token එකේ Claim එක ඇතුළත් වේ.</li>
           <li>
-            විකල්පයක් ලෙස Console එකෙන් පමණක් සෑදිය හැකි <code>admins/{'{uid}'}</code> ලේඛනයක්
-            භාවිතා කිරීමද හැක — නමුත් එය Console එකෙන් පමණක් සෑදිය යුතුයි.
+            <strong>ක්‍රමය B (Firebase Admin SDK Custom Claim):</strong>{' '}
+            <code>setCustomUserClaims(uid, {'{ admin: true }'})</code> භාවිතා කරන්න.
           </li>
         </ol>
-        <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)' }}>
-          <strong>කිසිවිටෙකත්</strong> පරිශීලකයාට තමන්ගේම Admin අවසර සකසා ගැනීමට ඉඩ
-          දෙන්නට එපා — එය බ්‍රවුසරයේ Admin බොත්තමක් සැඟවීමට වඩා වෙනස් කරුණකි.
-        </p>
       </section>
 
       <section className="surface-card">

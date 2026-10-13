@@ -10,7 +10,7 @@ export const SEED_COURSES: Course[] = [
       'සංගීතය පිළිබඳ මූලික දැනුමක් නොමැති ආරම්භකයින් සඳහා Pitch, Rhythm, Tempo, Staff Notation (Treble & Bass Clef), Note Values සහ Piano Keyboard සැකැස්ම මුල සිට සරල සිංහලෙන්.',
     category: 'music-foundations',
     level: 1,
-    lessonIds: ['lesson-101', 'lesson-102', 'lesson-103'],
+    lessonIds: ['lesson-101', 'lesson-102', 'lesson-103', 'lesson-104'],
     plannedTotalLessons: 12,
     outcomesSi: [
       'පියානෝ යතුරු පුවරුවේ ඕනෑම ස්වරයක් (A–G, Sharps/Flats) නිවැරදිව හඳුනා ගැනීම.',
@@ -30,7 +30,7 @@ export const SEED_COURSES: Course[] = [
       'Semitones, Major සහ Minor Scales (Natural, Harmonic, Melodic), Intervals, Triads, Seventh Chords, Inversions, Diatonic Harmony, Roman Numeral Analysis සහ Circle of Fifths පිළිබඳ ගැඹුරු න්‍යායාත්මක පාඨමාලාව.',
     category: 'music-theory',
     level: 2,
-    lessonIds: ['lesson-201', 'lesson-202', 'lesson-203'],
+    lessonIds: ['lesson-201', 'lesson-202', 'lesson-203', 'lesson-204'],
     plannedTotalLessons: 12,
     outcomesSi: [
       'ඕනෑම මූලික ස්වරයකින් Major සහ Minor ස්වර මාලා ගොඩනැගීම.',
@@ -130,7 +130,7 @@ export const SEED_COURSES: Course[] = [
       'Static Balance, Parametric EQ, Frequency Masking ඉවත් කිරීම, Dynamic Range Compression (Threshold, Ratio, Attack, Release), Reverb/Delay, Panning, Phase Correlation සහ Vocal/Drum Mixing.',
     category: 'mixing',
     level: 7,
-    lessonIds: ['lesson-701', 'lesson-702'],
+    lessonIds: ['lesson-701', 'lesson-702', 'lesson-703'],
     plannedTotalLessons: 8,
     outcomesSi: [
       'Parametric EQ (HPF, Bell, Shelf) මගින් Frequency Masking ඉවත් කිරීම.',

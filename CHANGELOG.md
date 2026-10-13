@@ -16,6 +16,19 @@ versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.1.0] — 2026-10-13
+
+### Added
+- **Firebase Realtime Database (`firebase/database`) first-class integration** alongside Cloud Firestore (`https://auramusic-daa98-default-rtdb.asia-southeast1.firebasedatabase.app/`), across `firebase.ts`, `authService.ts`, `courseService.ts`, `lessonService.ts`, `progressService.ts` and `quizService.ts`.
+- **Production-ready Realtime Database Security Rules (`firebase/database.rules.json`)** with root default-deny (`".read": false`, `".write": false`), query-constrained public reads on `/courses` and `/lessons`, strict per-UID isolation on `/users`, `/userProgress`, `/userBookmarks` and `/quizAttempts`, immutable quiz attempts, and a console-only `/admins/{uid}` registry (`".write": false`) alongside Firebase Auth custom claims (`admin: true`).
+- **Mirrored Realtime Database Rules Simulator (`src/lib/rtdbRulesSimulator.ts`)** and automated security test suite in `src/test/securityRules.test.ts` (55 security tests total across Firestore and Realtime Database rules).
+- **Interactive Firebase & Security Rules Center (`src/features/admin/FirebaseRulesPanel.tsx`)** embedded in `/about#firebase-rules` and `/admin`, with one-click copy buttons for `database.rules.json` and `firestore.rules`, signed-in UID copy, and runtime Firebase connection settings.
+- **Realtime Database curriculum seeding script (`scripts/seed-rtdb.mjs` / `npm run seed:rtdb`)** and one-click Admin CMS seeding button; seeded all 9 courses, 24 lessons and 24 quizzes into `https://auramusic-daa98-default-rtdb.asia-southeast1.firebasedatabase.app/`.
+- **Full Lesson Creation & Course Management in Admin CMS (`src/features/admin/AdminCmsPage.tsx`)**: admins can now create complete new lessons and edit courses directly in the browser, persisting to Firebase Realtime Database, Firestore, and local storage.
+- **3 new original Sinhala lessons & quizzes** (`lesson-104` Piano Fingering & Enharmonics, `lesson-204` Modes of the Major Scale, `lesson-703` Vocal & Drum Bus Mixing / Parallel Compression), bringing the authored curriculum to **24 lessons and 24 quizzes**.
+
+---
+
 ## [1.0.0] — 2026-10-12
 
 First functional release: a working Sinhala-first music education platform, not a

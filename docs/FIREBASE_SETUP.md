@@ -78,21 +78,36 @@ server-side by Firebase. Aura never stores a credential.
 
 ```dotenv
 VITE_FIREBASE_API_KEY=AIza...
-VITE_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
-VITE_FIREBASE_PROJECT_ID=your-project
-VITE_FIREBASE_STORAGE_BUCKET=your-project.appspot.com
-VITE_FIREBASE_MESSAGING_SENDER_ID=1234567890
-VITE_FIREBASE_APP_ID=1:1234567890:web:abcdef123456
+VITE_FIREBASE_AUTH_DOMAIN=auramusic-daa98.firebaseapp.com
+VITE_FIREBASE_DATABASE_URL=https://auramusic-daa98-default-rtdb.asia-southeast1.firebasedatabase.app
+VITE_FIREBASE_PROJECT_ID=auramusic-daa98
+VITE_FIREBASE_STORAGE_BUCKET=auramusic-daa98.firebasestorage.app
+VITE_FIREBASE_MESSAGING_SENDER_ID=466766006378
+VITE_FIREBASE_APP_ID=1:466766006378:web:5e2012d6c26d623a9d6213
+VITE_FIREBASE_MEASUREMENT_ID=G-MLZFJ66C1V
 VITE_USE_FIREBASE_EMULATORS=false
 ```
 
-4. Put the project id in `.firebaserc` (replace the placeholder):
+4. Put the project id in `.firebaserc`:
 
 ```json
-{ "projects": { "default": "your-project" } }
+{ "projects": { "default": "auramusic-daa98" } }
 ```
 
-5. Restart `npm run dev`. The Local Studio Mode banner should disappear.
+5. Restart `npm run dev`. The Local Studio Mode banner disappears and the app connects to Firebase Realtime Database (`https://auramusic-daa98-default-rtdb.asia-southeast1.firebasedatabase.app/`) and Firebase Auth.
+
+### Step-by-Step: Applying Realtime Database Rules (`firebase/database.rules.json`)
+
+1. Open **Firebase Console → Build → Realtime Database → Rules** (or visit `/about#firebase-rules` in the app and click **Copy Realtime DB Rules**).
+2. Paste the contents of [`firebase/database.rules.json`](../firebase/database.rules.json) and click **Publish**.
+3. Alternatively, deploy via CLI:
+   ```bash
+   npx firebase-tools deploy --only database,firestore:rules,firestore:indexes
+   ```
+4. To seed or update the public curriculum in Realtime Database:
+   ```bash
+   npm run seed:rtdb
+   ```
 
 ### Is it safe to have these values in the browser?
 
