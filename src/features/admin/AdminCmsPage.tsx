@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
+  BookOpen,
   ChevronDown,
   ChevronUp,
+  Database,
   Eye,
   FileEdit,
   Filter,
@@ -12,16 +14,57 @@ import {
   ShieldCheck,
   Upload,
 } from 'lucide-react';
-import { Course, Lesson } from '../../types/content';
+import { Course, CurriculumCategory, CurriculumLevel, Lesson } from '../../types/content';
 import {
   fetchAllLessonsIncludingDrafts,
-  saveEditorOverride,
+  saveLessonToCloud,
+  seedCurriculumToRealtimeDb,
   validateLessonForPublish,
 } from '../../services/lessonService';
-import { fetchCourses } from '../../services/courseService';
+import {
+  fetchAllCoursesIncludingDrafts,
+  saveCourseToCloud,
+  validateCourseForPublish,
+} from '../../services/courseService';
 import { EmptyState, LoadingState, StatusBanner } from '../../components/feedback/Feedback';
 import { useAuth } from '../../hooks/useAuth';
 import { usingFirebaseAuth } from '../../services/authService';
+import { FirebaseRulesPanel } from './FirebaseRulesPanel';
+
+function createBlankLesson(courses: Course[]): Lesson {
+  const defaultCourse = courses[0];
+  const stamp = Date.now().toString(36).slice(-4);
+  return {
+    id: `lesson-custom-${stamp}`,
+    slug: `new-sinhala-lesson-${stamp}`,
+    courseId: defaultCourse?.id ?? 'course-level-1',
+    titleSi: '',
+    titleEn: '',
+    descriptionSi: '',
+    category: (defaultCourse?.category ?? 'music-foundations') as CurriculumCategory,
+    level: (defaultCourse?.level ?? 1) as CurriculumLevel,
+    prerequisites: [],
+    estimatedMinutes: 20,
+    learningObjectives: ['මූලික සංකල්පය නිවැරදිව තේරුම් ගැනීම.'],
+    sections: [
+      {
+        id: `sec-${stamp}-1`,
+        headingSi: '1. හැඳින්වීම (Introduction)',
+        headingEn: 'Introduction',
+        bodySi: '',
+      },
+    ],
+    examples: [],
+    exercises: [],
+    exerciseIds: [],
+    quizIds: [],
+    summarySi: '',
+    furtherPracticeSi: [],
+    published: false,
+    order: 99,
+    updatedAt: new Date().toISOString(),
+  };
+}
 
 export function AdminCmsPage() {
   const { user } = useAuth();
@@ -32,12 +75,18 @@ export function AdminCmsPage() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'published' | 'draft'>('all');
   const [courseFilter, setCourseFilter] = useState('all');
   const [editing, setEditing] = useState<Lesson | null>(null);
+  const [isCreatingNew, setIsCreatingNew] = useState(false);
+  const [editingCourse, setEditingCourse] = useState<Course | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [previewing, setPreviewing] = useState<Lesson | null>(null);
+  const [seeding, setSeeding] = useState(false);
 
   async function load() {
     setLoading(true);
-    const [l, c] = await Promise.all([fetchAllLessonsIncludingDrafts(), fetchCourses()]);
+    const [l, c] = await Promise.all([
+      fetchAllLessonsIncludingDrafts(),
+      fetchAllCoursesIncludingDrafts(),
+    ]);
     setLessons(l);
     setCourses(c);
     setLoading(false);
@@ -59,31 +108,62 @@ export function AdminCmsPage() {
   }, [lessons, query, statusFilter, courseFilter]);
 
   const validationErrors = editing ? validateLessonForPublish(editing) : [];
+  const courseValidationErrors = editingCourse ? validateCourseForPublish(editingCourse) : [];
 
-  function persist(lesson: Lesson) {
-    saveEditorOverride({
-      lessonId: lesson.id,
-      published: lesson.published,
-      order: lesson.order,
-      titleSi: lesson.titleSi,
-      titleEn: lesson.titleEn,
-      descriptionSi: lesson.descriptionSi,
-      updatedAt: new Date().toISOString(),
+  async function persist(lesson: Lesson) {
+    const result = await saveLessonToCloud(lesson);
+    setLessons((prev) => {
+      const exists = prev.some((l) => l.id === lesson.id);
+      if (exists) {
+        return prev.map((l) => (l.id === lesson.id ? lesson : l));
+      }
+      return [...prev, lesson].sort((a, b) => a.level - b.level || a.order - b.order);
     });
-    setLessons((prev) => prev.map((l) => (l.id === lesson.id ? lesson : l)));
+    setIsCreatingNew(false);
     setNotice(
       `“${lesson.titleSi}” සුරකින ලදී. ${
-        usingFirebaseAuth()
-          ? 'Firebase සම්බන්ධ කර ඇති අතර, ලිවීම Firestore Security Rules මගින් පරීක්ෂා කරනු ලැබේ.'
-          : 'දේශීය ප්‍රකාරයේ සුරකින ලදී (මෙම බ්‍රවුසරයේ පමණක්).'
+        result.savedToRtdb
+          ? 'Firebase Realtime Database වෙත සාර්ථකව සුරකින ලදී.'
+          : usingFirebaseAuth()
+            ? 'Firebase සම්බන්ධ කර ඇති අතර, ලිවීම Security Rules මගින් පරීක්ෂා කරනු ලැබේ.'
+            : 'දේශීය ප්‍රකාරයේ සුරකින ලදී (මෙම බ්‍රවුසරයේ පමණක්).'
       }`
+    );
+  }
+
+  async function persistCourse(course: Course) {
+    const result = await saveCourseToCloud(course);
+    setCourses((prev) => prev.map((c) => (c.id === course.id ? course : c)));
+    setEditingCourse(null);
+    setNotice(
+      `“${course.titleSi}” පාඨමාලාව සුරකින ලදී (${
+        result.savedToRtdb ? 'Realtime Database + Local' : 'Local'
+      }).`
     );
   }
 
   function move(lesson: Lesson, direction: -1 | 1) {
     const next = { ...lesson, order: Math.max(1, lesson.order + direction) };
-    persist(next);
+    void persist(next);
     setEditing(next.id === editing?.id ? next : editing);
+  }
+
+  async function handleSeedRtdb() {
+    setSeeding(true);
+    try {
+      const counts = await seedCurriculumToRealtimeDb();
+      setNotice(
+        `Firebase Realtime Database වෙත පාඨමාලා ${counts.coursesCount} ක්, පාඩම් ${counts.lessonsCount} ක් සහ ප්‍රශ්නාවලි ${counts.quizzesCount} ක් සාර්ථකව උඩුගත කරන ලදී!`
+      );
+    } catch (err) {
+      setNotice(
+        err instanceof Error
+          ? `Realtime DB උඩුගත කිරීම අසාර්ථක විය: ${err.message}`
+          : 'Realtime DB උඩුගත කිරීම අසාර්ථක විය.'
+      );
+    } finally {
+      setSeeding(false);
+    }
   }
 
   if (loading) return <LoadingState labelSi="පරිපාලන දත්ත පූරණය වෙමින්..." />;
@@ -98,14 +178,40 @@ export function AdminCmsPage() {
 
   return (
     <div style={{ display: 'grid', gap: 'var(--space-5)' }}>
-      <header>
-        <h1 style={{ marginBottom: '0.3rem' }}>
-          <ShieldCheck size={22} style={{ verticalAlign: '-4px', marginRight: 6 }} aria-hidden="true" />
-          අන්තර්ගත කළමනාකරණ පැනලය (Admin CMS)
-        </h1>
-        <p style={{ color: 'var(--text-muted)' }}>
-          පාඩම් සහ පාඨමාලා සංස්කරණය, පිළිවෙල සැකසීම, ප්‍රකාශනය සහ පෙරදසුන් කිරීම.
-        </p>
+      <header style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
+        <div>
+          <h1 style={{ marginBottom: '0.3rem' }}>
+            <ShieldCheck size={22} style={{ verticalAlign: '-4px', marginRight: 6 }} aria-hidden="true" />
+            අන්තර්ගත කළමනාකරණ පැනලය (Admin CMS)
+          </h1>
+          <p style={{ color: 'var(--text-muted)', margin: 0 }}>
+            පාඩම් සහ පාඨමාලා නිර්මාණය, සංස්කරණය, පිළිවෙල සැකසීම, ප්‍රකාශනය සහ Firebase Realtime Database කළමනාකරණය.
+          </p>
+        </div>
+
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignSelf: 'flex-start' }}>
+          <button
+            type="button"
+            className="btn btn-primary btn-sm"
+            onClick={() => {
+              const blank = createBlankLesson(courses);
+              setIsCreatingNew(true);
+              setEditing(blank);
+              setPreviewing(null);
+            }}
+          >
+            <Plus size={14} aria-hidden="true" /> නව පාඩමක් සාදන්න
+          </button>
+          <button
+            type="button"
+            className="btn btn-outline btn-sm"
+            onClick={() => void handleSeedRtdb()}
+            disabled={seeding}
+          >
+            <Database size={14} aria-hidden="true" />{' '}
+            {seeding ? 'Realtime DB වෙත යවමින්...' : 'Seed Curriculum → Realtime DB'}
+          </button>
+        </div>
       </header>
 
       {/* Authorization transparency */}
@@ -114,26 +220,23 @@ export function AdminCmsPage() {
         <ul style={{ margin: 0, fontSize: '0.87rem', color: 'var(--text-secondary)', paddingLeft: '1.1rem' }}>
           <li>
             Admin තත්ත්වය තීරණය වන්නේ <strong>Firebase Auth Custom Claim</strong> (
-            <code>admin: true</code>) මගිනි. එය සේවාදායකය මගින් පමණක් සකසනු ලබන අතර බ්‍රවුසරයෙන්
-            වෙනස් කළ නොහැක.
+            <code>admin: true</code>) හෝ Firebase Console මගින් පමණක් සැකසිය හැකි{' '}
+            <code>/admins/{'{uid}'}: true</code> මගිනි. එය බ්‍රවුසරයෙන් වෙනස් කළ නොහැක (
+            <code>&quot;.write&quot;: false</code>).
           </li>
           <li>
             පරිශීලක පැතිකඩ (Profile) තුළ ඇති <code>role</code> ක්ෂේත්‍රයක් කිසිවිටෙකත් අවසර දීම
             සඳහා භාවිතා නොකෙරේ — එය පරිශීලකයාටම වෙනස් කළ හැකි බැවිනි.
           </li>
           <li>
-            සියලුම වරප්‍රසාදිත Firestore ලිවීම් <code>firebase/firestore.rules</code> මගින් ස්වාධීනව
-            පරීක්ෂා කරනු ලැබේ. මෙම පිටුව සැඟවීම හෝ පෙන්වීම කිසිසේත් ආරක්ෂණ යාන්ත්‍රණයක් නොවේ.
-          </li>
-          <li>
-            පළමු Admin පරිපාලක නිර්මාණය කරන ආකාරය <Link to="/about">දැනුම්දීම් පිටුවේ</Link> සහ{' '}
-            <code>docs/SECURITY.md</code> හි විස්තර කර ඇත.
+            සියලුම වරප්‍රසාදිත ලිවීම් <code>firebase/database.rules.json</code> සහ{' '}
+            <code>firebase/firestore.rules</code> මගින් ස්වාධීනව පරීක්ෂා කරනු ලැබේ.
           </li>
         </ul>
       </section>
 
       {notice && (
-        <StatusBanner tone="success" titleSi="සුරකින ලදී">
+        <StatusBanner tone="success" titleSi="තත්ත්ව යාවත්කාලීන කිරීම">
           {notice}
         </StatusBanner>
       )}
@@ -199,7 +302,7 @@ export function AdminCmsPage() {
 
       {/* Lesson table */}
       <section className="surface-card">
-        <h2 style={{ fontSize: '1rem' }}>පාඩම්</h2>
+        <h2 style={{ fontSize: '1rem' }}>පාඩම් ලැයිස්තුව</h2>
         {filtered.length === 0 ? (
           <EmptyState
             titleSi="පාඩම් හමු නොවිණි"
@@ -264,6 +367,7 @@ export function AdminCmsPage() {
                           type="button"
                           className="btn btn-secondary btn-sm"
                           onClick={() => {
+                            setIsCreatingNew(false);
                             setEditing(lesson);
                             setPreviewing(null);
                           }}
@@ -290,12 +394,12 @@ export function AdminCmsPage() {
         )}
       </section>
 
-      {/* Editor */}
+      {/* Lesson Editor (Create or Edit) */}
       {editing && (
         <section className="surface-card">
           <h2 style={{ fontSize: '1rem' }}>
             <FileEdit size={17} style={{ verticalAlign: '-3px', marginRight: 6 }} aria-hidden="true" />
-            සංස්කරණය: {editing.titleSi}
+            {isCreatingNew ? 'නව පාඩමක් නිර්මාණය කිරීම' : `සංස්කරණය: ${editing.titleSi}`}
           </h2>
 
           {validationErrors.length > 0 && (
@@ -331,15 +435,41 @@ export function AdminCmsPage() {
               />
             </div>
 
-            <div className="lab-control">
-              <label htmlFor="edit-slug">Slug * (අකුරු කුඩා ඉංග්‍රීසි, අංක සහ - පමණි)</label>
-              <input
-                id="edit-slug"
-                type="text"
-                className="input-field"
-                value={editing.slug}
-                onChange={(e) => setEditing({ ...editing, slug: e.target.value })}
-              />
+            <div className="lab-control-row" style={{ marginBottom: 0 }}>
+              <div className="lab-control" style={{ flexBasis: 260 }}>
+                <label htmlFor="edit-slug">Slug * (අකුරු කුඩා ඉංග්‍රීසි, අංක සහ - පමණි)</label>
+                <input
+                  id="edit-slug"
+                  type="text"
+                  className="input-field"
+                  value={editing.slug}
+                  onChange={(e) => setEditing({ ...editing, slug: e.target.value })}
+                />
+              </div>
+
+              <div className="lab-control" style={{ flexBasis: 260 }}>
+                <label htmlFor="edit-course-select">පාඨමාලාව (Course) *</label>
+                <select
+                  id="edit-course-select"
+                  className="select-field"
+                  value={editing.courseId}
+                  onChange={(e) => {
+                    const selected = courses.find((c) => c.id === e.target.value);
+                    setEditing({
+                      ...editing,
+                      courseId: e.target.value,
+                      level: (selected?.level ?? editing.level) as CurriculumLevel,
+                      category: (selected?.category ?? editing.category) as CurriculumCategory,
+                    });
+                  }}
+                >
+                  {courses.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      මට්ටම {c.level} — {c.titleSi}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             <div className="lab-control">
@@ -352,6 +482,36 @@ export function AdminCmsPage() {
                 onChange={(e) => setEditing({ ...editing, descriptionSi: e.target.value })}
               />
             </div>
+
+            <div className="lab-control">
+              <label htmlFor="edit-summary">පාඩම් සාරාංශය (summarySi) *</label>
+              <textarea
+                id="edit-summary"
+                className="textarea-field"
+                rows={2}
+                value={editing.summarySi}
+                onChange={(e) => setEditing({ ...editing, summarySi: e.target.value })}
+              />
+            </div>
+
+            {editing.sections.length > 0 && (
+              <div className="lab-control">
+                <label htmlFor="edit-section-body">
+                  ප්‍රධාන පාඩම් අංශය ({editing.sections[0].headingSi}) *
+                </label>
+                <textarea
+                  id="edit-section-body"
+                  className="textarea-field"
+                  rows={5}
+                  value={editing.sections[0].bodySi}
+                  onChange={(e) => {
+                    const updatedSections = [...editing.sections];
+                    updatedSections[0] = { ...updatedSections[0], bodySi: e.target.value };
+                    setEditing({ ...editing, sections: updatedSections });
+                  }}
+                />
+              </div>
+            )}
 
             <div className="lab-control-row" style={{ marginBottom: 0 }}>
               <div className="lab-control">
@@ -398,7 +558,7 @@ export function AdminCmsPage() {
               <button
                 type="button"
                 className="btn btn-primary"
-                onClick={() => persist(editing)}
+                onClick={() => void persist(editing)}
                 disabled={validationErrors.length > 0 && editing.published}
               >
                 <Save size={14} aria-hidden="true" /> සුරකින්න
@@ -408,12 +568,19 @@ export function AdminCmsPage() {
                 className="btn btn-outline"
                 disabled={validationErrors.length > 0}
                 onClick={() => {
-                  persist({ ...editing, published: true });
+                  void persist({ ...editing, published: true });
                 }}
               >
                 <Upload size={14} aria-hidden="true" /> සුරකින්න සහ ප්‍රකාශ කරන්න
               </button>
-              <button type="button" className="btn btn-secondary" onClick={() => setEditing(null)}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => {
+                  setEditing(null);
+                  setIsCreatingNew(false);
+                }}
+              >
                 අවලංගු කරන්න
               </button>
             </div>
@@ -432,7 +599,14 @@ export function AdminCmsPage() {
           <p style={{ color: 'var(--text-secondary)' }}>{previewing.descriptionSi}</p>
 
           {previewing.sections.map((section) => (
-            <div key={section.id} style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 'var(--space-3)', marginTop: 'var(--space-3)' }}>
+            <div
+              key={section.id}
+              style={{
+                borderTop: '1px solid var(--border-subtle)',
+                paddingTop: 'var(--space-3)',
+                marginTop: 'var(--space-3)',
+              }}
+            >
               <h3 style={{ fontSize: '0.95rem' }}>{section.headingSi}</h3>
               {section.bodySi.split('\n\n').map((p, i) => (
                 <p key={i} style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
@@ -453,24 +627,122 @@ export function AdminCmsPage() {
         </section>
       )}
 
-      {/* New lesson placeholder */}
+      {/* Course Management */}
       <section className="surface-card">
         <h2 style={{ fontSize: '0.98rem' }}>
-          <Plus size={17} style={{ verticalAlign: '-3px', marginRight: 6 }} aria-hidden="true" />
-          නව පාඩමක් සෑදීම
+          <BookOpen size={17} style={{ verticalAlign: '-3px', marginRight: 6 }} aria-hidden="true" />
+          පාඨමාලා කළමනාකරණය (Courses)
         </h2>
-        <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
-          සම්පූර්ණ නව පාඩමක් අන්තර්ගතය සමඟ නිර්මාණය කිරීම තවමත් සංවර්ධනය වෙමින් පවතී. දැනට
-          ඔබට පවතින පාඩම් සංස්කරණය කිරීමට, පිළිවෙල වෙනස් කිරීමට, ප්‍රකාශ කිරීමට හෝ කෙටුම්පත්
-          ලෙස තැබීමට හැක. නව පාඩම් දැනට{' '}
-          <code>src/content/lessons/</code> හි රචනා කර repository එකට එක් කරනු ලැබේ.
-        </p>
-        <p style={{ fontSize: '0.84rem', color: 'var(--text-muted)', marginBottom: 0 }}>
-          <strong>වගකීම් සහගත සංස්කරණය:</strong> පාඩමක් ප්‍රකාශ කිරීමට පෙර අවම වශයෙන් අංශයක්,
-          ඉගෙනුම් අරමුණක් සහ සාරාංශයක් තිබිය යුතුයි. සම්පූර්ණ නොවන පාඩමක් ප්‍රකාශ නොකරන්න —
-          එය ඉගෙනුම්කරුවන් නොමග යැවීමකි.
-        </p>
+        <div style={{ overflowX: 'auto' }}>
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th scope="col">මට්ටම</th>
+                <th scope="col">පාඨමාලාව</th>
+                <th scope="col">පාඩම් ගණන</th>
+                <th scope="col">තත්ත්වය</th>
+                <th scope="col">ක්‍රියා</th>
+              </tr>
+            </thead>
+            <tbody>
+              {courses.map((course) => (
+                <tr key={course.id}>
+                  <td>{course.level}</td>
+                  <td>
+                    <strong>{course.titleSi}</strong>
+                    <br />
+                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                      {course.titleEn}
+                    </span>
+                  </td>
+                  <td>{course.lessonIds.length}</td>
+                  <td>
+                    <span className={`badge ${course.published ? 'badge-success' : 'badge-amber'}`}>
+                      {course.published ? 'ප්‍රකාශිත' : 'කෙටුම්පත'}
+                    </span>
+                  </td>
+                  <td>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => setEditingCourse(course)}
+                    >
+                      <FileEdit size={12} aria-hidden="true" /> පාඨමාලාව සංස්කරණය
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {editingCourse && (
+          <div
+            style={{
+              marginTop: 'var(--space-4)',
+              paddingTop: 'var(--space-4)',
+              borderTop: '1px solid var(--border-subtle)',
+              display: 'grid',
+              gap: 'var(--space-3)',
+            }}
+          >
+            <h3 style={{ fontSize: '0.95rem', margin: 0 }}>
+              පාඨමාලා සංස්කරණය: {editingCourse.titleSi}
+            </h3>
+            {courseValidationErrors.length > 0 && (
+              <StatusBanner tone="error" titleSi="පාඨමාලා දෝෂ">
+                <ul style={{ margin: 0, paddingLeft: '1.1rem' }}>
+                  {courseValidationErrors.map((e) => (
+                    <li key={e}>{e}</li>
+                  ))}
+                </ul>
+              </StatusBanner>
+            )}
+            <div className="lab-control">
+              <label htmlFor="course-title-si">සිංහල මාතෘකාව</label>
+              <input
+                id="course-title-si"
+                type="text"
+                className="input-field"
+                value={editingCourse.titleSi}
+                onChange={(e) => setEditingCourse({ ...editingCourse, titleSi: e.target.value })}
+              />
+            </div>
+            <div className="lab-control">
+              <label htmlFor="course-desc-si">සිංහල විස්තරය</label>
+              <textarea
+                id="course-desc-si"
+                className="textarea-field"
+                rows={2}
+                value={editingCourse.descriptionSi}
+                onChange={(e) =>
+                  setEditingCourse({ ...editingCourse, descriptionSi: e.target.value })
+                }
+              />
+            </div>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                disabled={courseValidationErrors.length > 0}
+                onClick={() => void persistCourse(editingCourse)}
+              >
+                <Save size={13} aria-hidden="true" /> පාඨමාලාව සුරකින්න
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => setEditingCourse(null)}
+              >
+                අවලංගු කරන්න
+              </button>
+            </div>
+          </div>
+        )}
       </section>
+
+      {/* Embedded Firebase Rules & Setup Panel */}
+      <FirebaseRulesPanel />
     </div>
   );
 }

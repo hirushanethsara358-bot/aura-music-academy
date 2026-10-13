@@ -5,10 +5,12 @@
 > **Hiding a button in React is not security.**
 
 Every authorisation decision that protects data is made by
-[`firebase/firestore.rules`](../firebase/firestore.rules), executed on Google's
-servers. The React application decides only what to *render*. If the client
-were fully compromised — DevTools open, JavaScript patched, admin panel URL
-guessed — the rules would still reject every unauthorised read and write.
+[`firebase/database.rules.json`](../firebase/database.rules.json) (Firebase
+Realtime Database) and [`firebase/firestore.rules`](../firebase/firestore.rules)
+(Cloud Firestore), executed on Google's servers. The React application decides
+only what to *render*. If the client were fully compromised — DevTools open,
+JavaScript patched, admin panel URL guessed — the rules would still reject
+every unauthorised read and write.
 
 ---
 

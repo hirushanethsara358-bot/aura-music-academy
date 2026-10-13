@@ -231,6 +231,7 @@ export function AppLayout() {
             <strong style={{ display: 'block', marginBottom: '0.4rem' }}>තොරතුරු</strong>
             <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: '0.3rem' }}>
               <li><Link to="/about">අප ගැන</Link></li>
+              <li><Link to="/about#firebase-rules">Firebase Realtime DB & Rules</Link></li>
               <li><Link to="/about#limitations">සීමාවන් (Known Limitations)</Link></li>
               <li><Link to="/about#privacy">ඔබේ දත්ත ගැන</Link></li>
             </ul>

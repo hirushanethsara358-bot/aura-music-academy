@@ -7,6 +7,7 @@ import {
   RuleAuth,
   userAuth,
 } from '../lib/firestoreRulesSimulator';
+import { evaluateRtdbRule } from '../lib/rtdbRulesSimulator';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -472,5 +473,232 @@ describe('Rules file is present and default-deny', () => {
   it('declares rules_version 2', () => {
     const rules = fs.readFileSync(rulesPath, 'utf-8');
     expect(rules).toContain("rules_version = '2'");
+  });
+});
+
+describe('Firebase Realtime Database Security Rules (database.rules.json)', () => {
+  const rtdbRulesPath = path.resolve(__dirname, '../../firebase/database.rules.json');
+
+  it('ships a valid JSON database.rules.json file with root default-deny', () => {
+    expect(fs.existsSync(rtdbRulesPath)).toBe(true);
+    const parsed = JSON.parse(fs.readFileSync(rtdbRulesPath, 'utf-8')) as {
+      rules: Record<string, unknown>;
+    };
+    expect(parsed.rules['.read']).toBe(false);
+    expect(parsed.rules['.write']).toBe(false);
+  });
+
+  it('unconditionally blocks client writes to /admins while allowing console-defined admins', () => {
+    const parsed = JSON.parse(fs.readFileSync(rtdbRulesPath, 'utf-8')) as {
+      rules: { admins: { '.write': boolean; $uid: { '.write': boolean } } };
+    };
+    expect(parsed.rules.admins['.write']).toBe(false);
+    expect(parsed.rules.admins.$uid['.write']).toBe(false);
+
+    expect(
+      evaluateRtdbRule({
+        auth: alice,
+        path: `/admins/${ALICE}`,
+        operation: 'write',
+        newData: { value: true },
+      })
+    ).toBe(false);
+    expect(
+      evaluateRtdbRule({
+        auth: admin,
+        path: `/admins/${ALICE}`,
+        operation: 'write',
+        newData: { value: true },
+      })
+    ).toBe(false);
+  });
+
+  it('allows public read of published courses and lessons, but denies unpublished drafts to non-admins', () => {
+    expect(
+      evaluateRtdbRule({
+        auth: anonymous,
+        path: '/courses/course-level-1',
+        operation: 'read',
+        data: { published: true },
+      })
+    ).toBe(true);
+
+    expect(
+      evaluateRtdbRule({
+        auth: anonymous,
+        path: '/lessons/lesson-draft',
+        operation: 'read',
+        data: { published: false },
+      })
+    ).toBe(false);
+
+    expect(
+      evaluateRtdbRule({
+        auth: admin,
+        path: '/lessons/lesson-draft',
+        operation: 'read',
+        data: { published: false },
+      })
+    ).toBe(true);
+  });
+
+  it('requires orderByChild("published").equalTo(true) when anonymous users query /courses or /lessons', () => {
+    expect(
+      evaluateRtdbRule({
+        auth: anonymous,
+        path: '/courses',
+        operation: 'read',
+      })
+    ).toBe(false);
+
+    expect(
+      evaluateRtdbRule({
+        auth: anonymous,
+        path: '/courses',
+        operation: 'read',
+        query: { orderByChild: 'published', equalTo: true },
+      })
+    ).toBe(true);
+  });
+
+  it('allows admin writes to /courses and /lessons (via token claim OR /admins/{uid}) and denies non-admins', () => {
+    const validLesson = {
+      titleSi: 'මට්ටම 1 පාඩම',
+      titleEn: 'Level 1 Lesson',
+      slug: 'level-1-lesson',
+      courseId: 'course-level-1',
+      summarySi: 'මෙය සම්පූර්ණ සාරාංශයකි.',
+      published: true,
+      order: 1,
+      estimatedMinutes: 20,
+    };
+
+    expect(
+      evaluateRtdbRule({
+        auth: alice,
+        path: '/lessons/lesson-101',
+        operation: 'write',
+        newData: validLesson,
+      })
+    ).toBe(false);
+
+    expect(
+      evaluateRtdbRule({
+        auth: admin,
+        path: '/lessons/lesson-101',
+        operation: 'write',
+        newData: validLesson,
+      })
+    ).toBe(true);
+
+    // Console-bootstrapped admin in /admins/{uid}
+    expect(
+      evaluateRtdbRule({
+        auth: alice,
+        rootAdmins: [ALICE],
+        path: '/lessons/lesson-101',
+        operation: 'write',
+        newData: validLesson,
+      })
+    ).toBe(true);
+  });
+
+  it('enforces cross-user isolation on /users, /userProgress, /userBookmarks, and /quizAttempts', () => {
+    const validProgress = {
+      uid: ALICE,
+      lessonId: 'lesson-101',
+      completed: true,
+      lastVisitedAt: '2026-10-13T00:00:00Z',
+      completedAt: '2026-10-13T00:00:00Z',
+      updatedAt: '2026-10-13T00:00:00Z',
+    };
+
+    expect(
+      evaluateRtdbRule({
+        auth: alice,
+        path: `/userProgress/${ALICE}/lesson-101`,
+        operation: 'write',
+        newData: validProgress,
+      })
+    ).toBe(true);
+
+    expect(
+      evaluateRtdbRule({
+        auth: bob,
+        path: `/userProgress/${ALICE}/lesson-101`,
+        operation: 'read',
+      })
+    ).toBe(false);
+
+    expect(
+      evaluateRtdbRule({
+        auth: bob,
+        path: `/userProgress/${ALICE}/lesson-101`,
+        operation: 'write',
+        newData: { ...validProgress, uid: BOB },
+      })
+    ).toBe(false);
+
+    // Rejects privilege escalation on /users/$uid
+    expect(
+      evaluateRtdbRule({
+        auth: alice,
+        path: `/users/${ALICE}`,
+        operation: 'write',
+        newData: {
+          uid: ALICE,
+          email: 'alice@example.com',
+          displayName: 'Alice',
+          role: 'admin',
+        },
+      })
+    ).toBe(false);
+  });
+
+  it('enforces immutable, bounded quizAttempts in Realtime Database', () => {
+    const validAttempt = {
+      id: 'attempt-1',
+      uid: ALICE,
+      quizId: 'quiz-101',
+      lessonId: 'lesson-101',
+      answers: { q1: 'a' },
+      score: 4,
+      totalQuestions: 5,
+      percentage: 80,
+      passed: true,
+      createdAt: '2026-10-13T00:00:00Z',
+    };
+
+    expect(
+      evaluateRtdbRule({
+        auth: alice,
+        path: `/quizAttempts/${ALICE}/attempt-1`,
+        operation: 'write',
+        data: null,
+        newData: validAttempt,
+      })
+    ).toBe(true);
+
+    // Cannot overwrite an existing attempt
+    expect(
+      evaluateRtdbRule({
+        auth: alice,
+        path: `/quizAttempts/${ALICE}/attempt-1`,
+        operation: 'write',
+        data: validAttempt,
+        newData: { ...validAttempt, score: 5, percentage: 100 },
+      })
+    ).toBe(false);
+
+    // Cannot record score > totalQuestions
+    expect(
+      evaluateRtdbRule({
+        auth: alice,
+        path: `/quizAttempts/${ALICE}/attempt-2`,
+        operation: 'write',
+        data: null,
+        newData: { ...validAttempt, score: 10 },
+      })
+    ).toBe(false);
   });
 });

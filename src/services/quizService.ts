@@ -1,3 +1,4 @@
+import { equalTo, get, orderByChild, query as rtdbQuery, ref, set } from 'firebase/database';
 import {
   addDoc,
   collection,
@@ -13,7 +14,7 @@ import {
 import { Quiz, QuizAttempt, QuizQuestion } from '../types/content';
 import { SEED_QUIZZES } from '../content/quizzes';
 import { readJson, STORAGE_KEYS, writeJson } from '../lib/storage';
-import { getFirestoreDb } from './firebase';
+import { getFirestoreDb, getRealtimeDb } from './firebase';
 
 export type AnswerValue = string | string[] | number;
 
@@ -34,6 +35,28 @@ export interface QuizGradeResult {
 }
 
 export async function fetchQuizByLessonId(lessonId: string): Promise<Quiz | null> {
+  const rtdb = getRealtimeDb();
+  if (rtdb) {
+    try {
+      const q = rtdbQuery(
+        ref(rtdb, 'quizzes'),
+        orderByChild('lessonId'),
+        equalTo(lessonId)
+      );
+      const snap = await get(q);
+      if (snap.exists()) {
+        const val = snap.val() as Record<string, Quiz>;
+        const firstEntry = Object.entries(val)[0];
+        if (firstEntry) {
+          const [id, data] = firstEntry;
+          return { ...data, id, questions: data.questions ?? [] };
+        }
+      }
+    } catch (error) {
+      console.warn('[Aura] quizService: RTDB quiz read failed, using seed quiz.', error);
+    }
+  }
+
   const db = getFirestoreDb();
   if (db) {
     try {
@@ -48,20 +71,33 @@ export async function fetchQuizByLessonId(lessonId: string): Promise<Quiz | null
         return { ...(d.data() as Quiz), id: d.id };
       }
     } catch (error) {
-      console.warn('[Aura] quizService: remote quiz read failed, using seed quiz.', error);
+      console.warn('[Aura] quizService: Firestore quiz read failed, using seed quiz.', error);
     }
   }
   return SEED_QUIZZES.find((quiz) => quiz.lessonId === lessonId) ?? null;
 }
 
 export async function fetchQuizById(quizId: string): Promise<Quiz | null> {
+  const rtdb = getRealtimeDb();
+  if (rtdb) {
+    try {
+      const snap = await get(ref(rtdb, `quizzes/${quizId}`));
+      if (snap.exists()) {
+        const data = snap.val() as Quiz;
+        return { ...data, id: quizId, questions: data.questions ?? [] };
+      }
+    } catch (error) {
+      console.warn('[Aura] quizService: RTDB get failed.', error);
+    }
+  }
+
   const db = getFirestoreDb();
   if (db) {
     try {
       const snap = await getDoc(doc(db, 'quizzes', quizId));
       if (snap.exists()) return { ...(snap.data() as Quiz), id: snap.id };
     } catch (error) {
-      console.warn('[Aura] quizService: getDoc failed.', error);
+      console.warn('[Aura] quizService: Firestore getDoc failed.', error);
     }
   }
   return SEED_QUIZZES.find((quiz) => quiz.id === quizId) ?? null;
@@ -71,7 +107,10 @@ export async function fetchQuizById(quizId: string): Promise<Quiz | null> {
  * Randomise question order for practice sessions.
  * Uses the Fisher–Yates shuffle.
  */
-export function shuffleQuestions(questions: QuizQuestion[], seedRandom: () => number = Math.random): QuizQuestion[] {
+export function shuffleQuestions(
+  questions: QuizQuestion[],
+  seedRandom: () => number = Math.random
+): QuizQuestion[] {
   const copy = [...questions];
   for (let i = copy.length - 1; i > 0; i -= 1) {
     const j = Math.floor(seedRandom() * (i + 1));
@@ -201,8 +240,9 @@ export async function saveQuizAttempt(
   result: QuizGradeResult
 ): Promise<QuizAttempt> {
   const createdAt = new Date().toISOString();
+  const attemptId = `attempt-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
   const attempt: QuizAttempt = {
-    id: `attempt-${Date.now().toString(36)}`,
+    id: attemptId,
     uid,
     quizId: quiz.id,
     lessonId: quiz.lessonId,
@@ -214,13 +254,19 @@ export async function saveQuizAttempt(
     createdAt,
   };
 
+  const rtdb = getRealtimeDb();
+  if (rtdb) {
+    try {
+      await set(ref(rtdb, `quizAttempts/${uid}/${attemptId}`), attempt);
+    } catch (error) {
+      console.warn('[Aura] quizService: RTDB attempt write failed; keeping locally.', error);
+    }
+  }
+
   const db = getFirestoreDb();
   if (db) {
     try {
-      // The document id is server-generated and the `uid` field is required to
-      // equal the caller's uid by firestore.rules — a user cannot write an
-      // attempt on behalf of anyone else.
-      const ref = await addDoc(collection(db, 'quizAttempts'), {
+      const refDoc = await addDoc(collection(db, 'quizAttempts'), {
         uid,
         quizId: quiz.id,
         lessonId: quiz.lessonId,
@@ -231,9 +277,9 @@ export async function saveQuizAttempt(
         passed: result.passed,
         createdAt: serverTimestamp(),
       });
-      attempt.id = ref.id;
+      attempt.id = refDoc.id;
     } catch (error) {
-      console.warn('[Aura] quizService: attempt write blocked or failed; keeping it locally.', error);
+      console.warn('[Aura] quizService: Firestore attempt write failed; keeping locally.', error);
     }
   }
 
@@ -244,6 +290,21 @@ export async function saveQuizAttempt(
 }
 
 export async function fetchQuizAttempts(uid: string): Promise<QuizAttempt[]> {
+  const rtdb = getRealtimeDb();
+  if (rtdb) {
+    try {
+      const snap = await get(ref(rtdb, `quizAttempts/${uid}`));
+      if (snap.exists()) {
+        const val = snap.val() as Record<string, QuizAttempt>;
+        return Object.entries(val)
+          .map(([id, data]) => ({ ...data, id }))
+          .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+      }
+    } catch (error) {
+      console.warn('[Aura] quizService: RTDB attempt read failed.', error);
+    }
+  }
+
   const db = getFirestoreDb();
   if (db) {
     try {
@@ -258,7 +319,7 @@ export async function fetchQuizAttempts(uid: string): Promise<QuizAttempt[]> {
         return snapshot.docs.map((d) => ({ ...(d.data() as QuizAttempt), id: d.id }));
       }
     } catch (error) {
-      console.warn('[Aura] quizService: attempt read failed, using local cache.', error);
+      console.warn('[Aura] quizService: Firestore attempt read failed, using local cache.', error);
     }
   }
   return readJson<QuizAttempt[]>(`${STORAGE_KEYS.quizAttempts}::${uid}`, []);

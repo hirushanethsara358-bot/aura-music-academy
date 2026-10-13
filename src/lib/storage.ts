@@ -62,7 +62,11 @@ export const STORAGE_KEYS = {
   lastVisited: 'last-visited',
   theme: 'theme',
   editorOverrides: 'editor-overrides',
+  editorCourseOverrides: 'editor-course-overrides',
   editorLessonDrafts: 'editor-lesson-drafts',
+  customLessons: 'custom-lessons',
+  customCourses: 'custom-courses',
   displayName: 'display-name',
   localAdminUids: 'local-admin-uids',
+  firebaseRuntimeConfig: 'firebase-runtime-config',
 } as const;

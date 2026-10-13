@@ -12,7 +12,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "preview": "vite preview --host 0.0.0.0 --port 4173",
-    "check:secrets": "node scripts/check-secrets.mjs"
+    "check:secrets": "node scripts/check-secrets.mjs",
+    "seed:rtdb": "node scripts/seed-rtdb.mjs"
   },
   "dependencies": {
     "firebase": "^11.3.1",

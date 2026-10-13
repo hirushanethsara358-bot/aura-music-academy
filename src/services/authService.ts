@@ -7,10 +7,16 @@ import {
   updateProfile,
   User,
 } from 'firebase/auth';
+import { get, ref, set } from 'firebase/database';
 import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { readJson, removeKey, STORAGE_KEYS, writeJson } from '../lib/storage';
 import { UserProfile } from '../types/content';
-import { getFirebaseAuth, getFirestoreDb, isFirebaseConfigured } from './firebase';
+import {
+  getFirebaseAuth,
+  getFirestoreDb,
+  getRealtimeDb,
+  isFirebaseConfigured,
+} from './firebase';
 
 export interface AuraUser {
   uid: string;
@@ -49,7 +55,6 @@ async function hashPassword(password: string): Promise<string> {
       .map((b) => b.toString(16).padStart(2, '0'))
       .join('');
   }
-  // Deterministic fallback for environments without Web Crypto (never used for real auth).
   let hash = 0;
   for (let i = 0; i < data.length; i += 1) {
     hash = (hash << 5) - hash + data[i];
@@ -122,25 +127,47 @@ export async function registerWithEmail(
   if (auth) {
     const credential = await createUserWithEmailAndPassword(auth, trimmedEmail, password);
     await updateProfile(credential.user, { displayName: name });
+    const nowIso = new Date().toISOString();
+
+    const rtdb = getRealtimeDb();
+    if (rtdb) {
+      try {
+        await set(ref(rtdb, `users/${credential.user.uid}`), {
+          uid: credential.user.uid,
+          email: trimmedEmail,
+          displayName: name,
+          lastVisitedLessonSlug: '',
+          createdAt: nowIso,
+          updatedAt: nowIso,
+        });
+      } catch (err) {
+        console.warn('[Aura] authService: RTDB profile write warning.', err);
+      }
+    }
 
     const db = getFirestoreDb();
     if (db) {
-      // Only non-sensitive profile fields are stored. Never passwords.
-      await setDoc(doc(db, 'users', credential.user.uid), {
-        uid: credential.user.uid,
-        email: trimmedEmail,
-        displayName: name,
-        lastVisitedLessonSlug: null,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
+      try {
+        // Only non-sensitive profile fields are stored. Never passwords.
+        await setDoc(doc(db, 'users', credential.user.uid), {
+          uid: credential.user.uid,
+          email: trimmedEmail,
+          displayName: name,
+          lastVisitedLessonSlug: null,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+      } catch (err) {
+        console.warn('[Aura] authService: Firestore profile write warning.', err);
+      }
     }
 
+    const isAdmin = await checkAdminClaim(credential.user);
     return {
       uid: credential.user.uid,
       email: trimmedEmail,
       displayName: name,
-      isAdmin: false,
+      isAdmin,
       isLocal: false,
     };
   }
@@ -225,19 +252,49 @@ export async function requestPasswordReset(email: string): Promise<void> {
 /**
  * Admin privilege check.
  *
- * SECURITY NOTE: Admin rights are derived from a custom auth claim
- * (request.auth.token.admin == true), which Firebase sets server-side and which
- * a user cannot modify from the browser. This function is ONLY used to decide
- * whether to *render* admin UI. Firestore Security Rules independently enforce
- * every privileged write, so hiding or showing a button is never the control.
+ * SECURITY NOTE: Admin rights are derived from:
+ *   1) A custom auth claim (`request.auth.token.admin == true`) set via Firebase Admin SDK, OR
+ *   2) A console-only `/admins/{uid}` entry in Realtime Database / Firestore where client writes
+ *      are unconditionally blocked (`".write": false` in database.rules.json and
+ *      `allow write: if false` in firestore.rules).
+ * A user profile field is NEVER consulted. Security rules independently enforce
+ * every privileged write on the server.
  */
 async function checkAdminClaim(user: User): Promise<boolean> {
   try {
     const token = await user.getIdTokenResult();
-    return token.claims.admin === true;
+    if (token.claims.admin === true) {
+      return true;
+    }
   } catch {
-    return false;
+    // Continue to console-only admins registry check
   }
+
+  const rtdb = getRealtimeDb();
+  if (rtdb) {
+    try {
+      const snap = await get(ref(rtdb, `admins/${user.uid}`));
+      if (snap.exists() && snap.val() === true) {
+        return true;
+      }
+    } catch {
+      // Ignore permission denied or network error
+    }
+  }
+
+  const db = getFirestoreDb();
+  if (db) {
+    try {
+      const snap = await getDoc(doc(db, 'admins', user.uid));
+      if (snap.exists()) {
+        return true;
+      }
+    } catch {
+      // Ignore permission denied or network error
+    }
+  }
+
+  return false;
 }
 
 export async function getCurrentUser(): Promise<AuraUser | null> {
@@ -285,15 +342,28 @@ export function subscribeToAuthChanges(
 }
 
 export async function fetchUserProfile(uid: string): Promise<UserProfile | null> {
+  const rtdb = getRealtimeDb();
+  if (rtdb) {
+    try {
+      const snap = await get(ref(rtdb, `users/${uid}`));
+      if (snap.exists()) {
+        return snap.val() as UserProfile;
+      }
+    } catch (error) {
+      console.warn('[Aura] authService: RTDB profile read failed.', error);
+    }
+  }
+
   const db = getFirestoreDb();
   if (db) {
     try {
       const snap = await getDoc(doc(db, 'users', uid));
       if (snap.exists()) return snap.data() as UserProfile;
     } catch (error) {
-      console.warn('[Aura] authService: profile read failed.', error);
+      console.warn('[Aura] authService: Firestore profile read failed.', error);
     }
   }
+
   const record = localUsers().find((u) => u.uid === uid);
   if (!record) return null;
   return {

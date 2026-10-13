@@ -1,4 +1,7 @@
 {
+  "database": {
+    "rules": "firebase/database.rules.json"
+  },
   "firestore": {
     "rules": "firebase/firestore.rules",
     "indexes": "firebase/firestore.indexes.json"
@@ -35,6 +38,7 @@
   },
   "emulators": {
     "auth": { "port": 9099 },
+    "database": { "port": 9000 },
     "firestore": { "port": 8080 },
     "hosting": { "port": 5000 },
     "ui": { "enabled": true }
