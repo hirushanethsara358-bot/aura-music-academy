@@ -89,6 +89,22 @@ function readConfig(): FirebaseConfig | null {
 
 let cached: FirebaseContext | null = null;
 
+function initializeAnalytics(app: FirebaseApp, config: FirebaseConfig): void {
+  if (!config.measurementId || typeof window === 'undefined' || import.meta.env.MODE === 'test') {
+    return;
+  }
+
+  // Load Analytics only in supported browsers. Its failure must not prevent
+  // lessons or authentication from loading.
+  void import('firebase/analytics')
+    .then(async ({ isSupported, getAnalytics }) => {
+      if (await isSupported()) getAnalytics(app);
+    })
+    .catch(() => {
+      console.warn('[Aura] Analytics is unavailable in this browser.');
+    });
+}
+
 /**
  * Initialise Firebase if (and only if) complete client configuration is present.
  * Supports BOTH Firebase Realtime Database (`rtdb`) and Cloud Firestore (`db`).
@@ -150,6 +166,7 @@ export function getFirebaseContext(): FirebaseContext {
     }
 
     cached = { configured: true, app, auth, db, rtdb, config };
+    initializeAnalytics(app, config);
     return cached;
   } catch (error) {
     console.error('[Aura] Firebase initialisation failed. Falling back to Local Studio Mode.', error);
