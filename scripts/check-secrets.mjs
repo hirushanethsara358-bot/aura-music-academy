@@ -35,6 +35,8 @@ const SKIP_PATTERNS = [
   /^package-lock\.json$/,
   /^\.github\//,
   /\.md$/,
+  // Public Firebase web client config (browser-visible by design, not a secret).
+  /^src\/services\/firebaseWebConfig\.ts$/,
 ];
 
 const RULES = [

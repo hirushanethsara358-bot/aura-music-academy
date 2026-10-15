@@ -3,6 +3,7 @@ import { Auth, getAuth } from 'firebase/auth';
 import { Database, connectDatabaseEmulator, getDatabase } from 'firebase/database';
 import { Firestore, connectFirestoreEmulator, getFirestore } from 'firebase/firestore';
 import { readJson, removeKey, STORAGE_KEYS, writeJson } from '../lib/storage';
+import { AURA_FIREBASE_WEB_CONFIG } from './firebaseWebConfig';
 
 export interface FirebaseConfig {
   apiKey: string;
@@ -66,8 +67,9 @@ function readConfig(): FirebaseConfig | null {
   const projectId = env.VITE_FIREBASE_PROJECT_ID?.trim();
   const appId = env.VITE_FIREBASE_APP_ID?.trim();
 
+  // Fall back to the bundled public web config of the Aura Firebase project.
   if (!apiKey || !authDomain || !projectId || !appId) {
-    return null;
+    return AURA_FIREBASE_WEB_CONFIG;
   }
 
   const explicitDbUrl = env.VITE_FIREBASE_DATABASE_URL?.trim();
