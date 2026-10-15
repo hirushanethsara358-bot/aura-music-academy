@@ -3,6 +3,7 @@ import { Auth, getAuth } from 'firebase/auth';
 import { Database, connectDatabaseEmulator, getDatabase } from 'firebase/database';
 import { Firestore, connectFirestoreEmulator, getFirestore } from 'firebase/firestore';
 import { readJson, removeKey, STORAGE_KEYS, writeJson } from '../lib/storage';
+import { AURA_FIREBASE_WEB_CONFIG } from './firebaseWebConfig';
 
 export interface FirebaseConfig {
   apiKey: string;
@@ -66,8 +67,9 @@ function readConfig(): FirebaseConfig | null {
   const projectId = env.VITE_FIREBASE_PROJECT_ID?.trim();
   const appId = env.VITE_FIREBASE_APP_ID?.trim();
 
+  // Fall back to the bundled public web config of the Aura Firebase project.
   if (!apiKey || !authDomain || !projectId || !appId) {
-    return null;
+    return AURA_FIREBASE_WEB_CONFIG;
   }
 
   const explicitDbUrl = env.VITE_FIREBASE_DATABASE_URL?.trim();
@@ -88,6 +90,22 @@ function readConfig(): FirebaseConfig | null {
 }
 
 let cached: FirebaseContext | null = null;
+
+function initializeAnalytics(app: FirebaseApp, config: FirebaseConfig): void {
+  if (!config.measurementId || typeof window === 'undefined' || import.meta.env.MODE === 'test') {
+    return;
+  }
+
+  // Load Analytics only in supported browsers. Its failure must not prevent
+  // lessons or authentication from loading.
+  void import('firebase/analytics')
+    .then(async ({ isSupported, getAnalytics }) => {
+      if (await isSupported()) getAnalytics(app);
+    })
+    .catch(() => {
+      console.warn('[Aura] Analytics is unavailable in this browser.');
+    });
+}
 
 /**
  * Initialise Firebase if (and only if) complete client configuration is present.
@@ -150,6 +168,7 @@ export function getFirebaseContext(): FirebaseContext {
     }
 
     cached = { configured: true, app, auth, db, rtdb, config };
+    initializeAnalytics(app, config);
     return cached;
   } catch (error) {
     console.error('[Aura] Firebase initialisation failed. Falling back to Local Studio Mode.', error);
